@@ -46,6 +46,14 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
       available: files.length >= 1
     },
     {
+      id: 'format_transform',
+      title: 'In anderes Format umwandeln',
+      description: 'CSV in ein anderes Spaltenformat konvertieren',
+      icon: <ArrowRight className="w-5 h-5" />,
+      minFiles: 1,
+      available: files.length >= 1
+    },
+    {
       id: 'transform',
       title: 'Spalten transformieren',
       description: 'Ändern, hinzufügen oder entfernen von Spalten',
@@ -87,6 +95,10 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
       case 'filter':
         setOperationOptions({ column: '', condition: 'contains', value: '' });
         break;
+      case 'format_transform':
+        // Skip processing, go directly to template mapping
+        onNext();
+        return;
       case 'transform':
         setOperationOptions({ transformations: [] });
         break;

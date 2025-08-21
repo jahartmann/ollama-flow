@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { LayoutTemplate, Sparkles, Brain, Eye, Filter, Plus, X } from 'lucide-react';
+import { LayoutTemplate, Sparkles, Brain, Eye, Filter, Plus, X, Upload } from 'lucide-react';
 import { CSVFile, CSVTemplate, TemplateColumnMapping } from '@/lib/transformationEngine';
 import { ollamaAPI } from '@/lib/ollamaApi';
 import { useToast } from '@/hooks/use-toast';
+import TemplateUpload from './TemplateUpload';
 
 interface TemplateMappingStepProps {
   files: CSVFile[];
@@ -42,10 +43,12 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
   const [aiEnabled, setAiEnabled] = useState<boolean>(false);
   const [aiPrompt, setAiPrompt] = useState<string>('');
   const [isAiProcessing, setIsAiProcessing] = useState<boolean>(false);
+  const [showTemplateUpload, setShowTemplateUpload] = useState<boolean>(false);
+  const [customTemplates, setCustomTemplates] = useState<CSVTemplate[]>([]);
   const { toast } = useToast();
 
   const sourceData = processedData || (files.length > 0 ? files[0] : null);
-  const availableTemplates = [
+  const defaultTemplates = [
     {
       id: 'custom',
       name: 'Benutzerdefiniertes Format',
@@ -78,6 +81,8 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
       ]
     }
   ];
+
+  const availableTemplates = [...defaultTemplates, ...customTemplates];
 
   // Initialize mappings when template is selected
   React.useEffect(() => {
@@ -139,20 +144,52 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
           if (sourceIndex !== -1) {
             let value = row[sourceIndex] || '';
             
-            // Apply transformation
-            switch (mapping.transformation) {
-              case 'uppercase':
-                value = value.toUpperCase();
-                break;
-              case 'lowercase':
-                value = value.toLowerCase();
-                break;
-              case 'trim':
-                value = value.trim();
-                break;
-              case 'format_phone':
-                value = value.replace(/\D/g, '').replace(/(\d{4})(\d{3})(\d{4})/, '+49 $1 $2 $3');
-                break;
+            // Apply transformation or formula
+            if (mapping.formula) {
+              // Apply formula (simplified implementation)
+              try {
+                // Basic formula support - CONCAT, UPPER, LOWER, etc.
+                let formula = mapping.formula;
+                
+                // Replace column references with actual values
+                sourceData.headers.forEach((header, headerIndex) => {
+                  const headerValue = row[headerIndex] || '';
+                  formula = formula.replace(new RegExp(`\\b${header}\\b`, 'g'), `"${headerValue}"`);
+                });
+                
+                // Basic formula evaluation
+                if (formula.startsWith('CONCAT(')) {
+                  const params = formula.slice(7, -1).split(',').map(p => p.trim().replace(/"/g, ''));
+                  value = params.join('');
+                } else if (formula.startsWith('UPPER(')) {
+                  const param = formula.slice(6, -1).replace(/"/g, '');
+                  value = param.toUpperCase();
+                } else if (formula.startsWith('LOWER(')) {
+                  const param = formula.slice(6, -1).replace(/"/g, '');
+                  value = param.toLowerCase();
+                } else {
+                  value = formula.replace(/"/g, '');
+                }
+              } catch (error) {
+                console.error('Formula error:', error);
+                value = value; // fallback to original value
+              }
+            } else {
+              // Apply standard transformations
+              switch (mapping.transformation) {
+                case 'uppercase':
+                  value = value.toUpperCase();
+                  break;
+                case 'lowercase':
+                  value = value.toLowerCase();
+                  break;
+                case 'trim':
+                  value = value.trim();
+                  break;
+                case 'format_phone':
+                  value = value.replace(/\D/g, '').replace(/(\d{4})(\d{3})(\d{4})/, '+49 $1 $2 $3');
+                  break;
+              }
             }
             
             mappedRow.push(value);
@@ -169,10 +206,25 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
   }, [sourceData, mappings, filters]);
 
   const handleTemplateSelect = (templateId: string) => {
+    if (templateId === 'upload') {
+      setShowTemplateUpload(true);
+      return;
+    }
+    
     const template = availableTemplates.find(t => t.id === templateId);
     if (template) {
       onTemplateSelect(template as any);
     }
+  };
+
+  const handleTemplateCreate = (template: CSVTemplate) => {
+    setCustomTemplates(prev => [...prev, template]);
+    onTemplateSelect(template);
+    setShowTemplateUpload(false);
+    toast({
+      title: "Template erstellt",
+      description: `Template "${template.name}" wurde erfolgreich erstellt`
+    });
   };
 
   const updateMapping = (index: number, field: keyof TemplateColumnMapping, value: string) => {
@@ -277,6 +329,15 @@ Bitte erstelle automatische Mappings und Transformationen.`,
                 <SelectValue placeholder="Template wählen..." />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="upload">
+                  <div className="flex items-center gap-2">
+                    <Upload className="w-4 h-4" />
+                    <div>
+                      <div className="font-medium">Neues Template erstellen</div>
+                      <div className="text-sm text-muted-foreground">Template hochladen oder manuell erstellen</div>
+                    </div>
+                  </div>
+                </SelectItem>
                 {availableTemplates.map(template => (
                   <SelectItem key={template.id} value={template.id}>
                     <div>
@@ -396,20 +457,33 @@ Bitte erstelle automatische Mappings und Transformationen.`,
                           <SelectItem value="lowercase">Kleinbuchstaben</SelectItem>
                           <SelectItem value="trim">Leerzeichen entfernen</SelectItem>
                           <SelectItem value="format_phone">Telefon formatieren</SelectItem>
+                          <SelectItem value="formula">Formel verwenden</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
                   
-                  <div>
-                    <label className="text-xs text-muted-foreground">Standardwert (optional)</label>
-                    <Input
-                      value={mapping.defaultValue || ''}
-                      onChange={(e) => updateMapping(index, 'defaultValue', e.target.value)}
-                      placeholder="Standardwert..."
-                      className="h-8"
-                    />
-                  </div>
+                  {mapping.transformation === 'formula' ? (
+                    <div className="col-span-2">
+                      <label className="text-xs text-muted-foreground">Formel</label>
+                      <Input
+                        value={mapping.formula || ''}
+                        onChange={(e) => updateMapping(index, 'formula', e.target.value)}
+                        placeholder="z.B. CONCAT(Vorname, ' ', Nachname)"
+                        className="h-8"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="text-xs text-muted-foreground">Standardwert (optional)</label>
+                      <Input
+                        value={mapping.defaultValue || ''}
+                        onChange={(e) => updateMapping(index, 'defaultValue', e.target.value)}
+                        placeholder="Standardwert..."
+                        className="h-8"
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </CardContent>

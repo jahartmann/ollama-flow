@@ -23,21 +23,21 @@ export interface NewColumn {
 export interface CSVTemplate {
   id: string;
   name: string;
-  headers: string[];
-  description?: string;
-  created: Date;
-  columns?: Array<{
+  description: string;
+  columns: {
     name: string;
-    type: 'string' | 'number' | 'email' | 'date';
+    type: 'string' | 'number' | 'email' | 'date' | 'boolean';
     required: boolean;
-  }>;
+    formula?: string;
+  }[];
 }
 
 export interface TemplateColumnMapping {
   templateColumn: string;
   sourceColumn: string;
-  transformation?: 'direct' | 'uppercase' | 'lowercase' | 'trim' | 'format_phone';
+  transformation?: 'direct' | 'uppercase' | 'lowercase' | 'trim' | 'format_phone' | 'formula';
   defaultValue?: string;
+  formula?: string;
 }
 
 export interface ConditionalRule {
@@ -70,11 +70,10 @@ export class TransformationEngine {
   }
 
   // Template Management
-  saveTemplate(template: Omit<CSVTemplate, 'id' | 'created'>): CSVTemplate {
+  saveTemplate(template: Omit<CSVTemplate, 'id'>): CSVTemplate {
     const newTemplate: CSVTemplate = {
       ...template,
-      id: this.generateId(),
-      created: new Date()
+      id: this.generateId()
     };
     
     this.templates.push(newTemplate);
@@ -103,8 +102,12 @@ export class TransformationEngine {
   createTemplateFromCSV(csvFile: CSVFile, name: string, description?: string): CSVTemplate {
     return this.saveTemplate({
       name,
-      description,
-      headers: csvFile.headers
+      description: description || '',
+      columns: csvFile.headers.map(header => ({
+        name: header,
+        type: 'string' as const,
+        required: false
+      }))
     });
   }
 
@@ -341,13 +344,13 @@ export class TransformationEngine {
     const transformedData: string[][] = [];
     
     // Create headers based on template
-    const newHeaders = [...template.headers];
+    const newHeaders = template.columns.map(col => col.name);
     
     // Transform each row according to template mappings
     file.data.forEach(row => {
       const newRow: string[] = [];
       
-      template.headers.forEach(templateColumn => {
+      newHeaders.forEach(templateColumn => {
         const mapping = mappings.find(m => m.templateColumn === templateColumn);
         let value = '';
         
@@ -506,11 +509,7 @@ export class TransformationEngine {
     try {
       const stored = localStorage.getItem('csv-templates');
       if (stored) {
-        const parsed = JSON.parse(stored);
-        this.templates = parsed.map((template: any) => ({
-          ...template,
-          created: new Date(template.created)
-        }));
+        this.templates = JSON.parse(stored);
       }
     } catch (error) {
       console.error('Failed to load templates:', error);

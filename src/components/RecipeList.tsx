@@ -91,20 +91,20 @@ const RecipeList: React.FC<RecipeListProps> = ({ onTemplateSelect }) => {
                           </p>
                         )}
                         <div className="flex flex-wrap gap-1">
-                          {template.headers.slice(0, 3).map((header, index) => (
+                          {template.columns.slice(0, 3).map((column, index) => (
                             <Badge key={index} variant="secondary" className="text-xs">
-                              {header}
+                              {column.name}
                             </Badge>
                           ))}
-                          {template.headers.length > 3 && (
+                          {template.columns.length > 3 && (
                             <Badge variant="outline" className="text-xs">
-                              +{template.headers.length - 3} weitere
+                              +{template.columns.length - 3} weitere
                             </Badge>
                           )}
                         </div>
                       </div>
                       <Badge variant="outline" className="text-xs">
-                        {template.headers.length} Spalten
+                        {template.columns.length} Spalten
                       </Badge>
                     </div>
                   </CardContent>

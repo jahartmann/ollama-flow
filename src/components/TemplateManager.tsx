@@ -79,7 +79,11 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
       const template = transformationEngine.saveTemplate({
         name: newTemplate.name,
         description: newTemplate.description,
-        headers
+        columns: headers.map(header => ({
+          name: header,
+          type: 'string' as const,
+          required: false
+        }))
       });
 
       refreshTemplates();
@@ -168,7 +172,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
       const duplicatedTemplate = transformationEngine.saveTemplate({
         name: `${template.name} (Kopie)`,
         description: template.description,
-        headers: [...template.headers]
+        columns: template.columns.map(col => ({ ...col }))
       });
 
       refreshTemplates();
@@ -186,7 +190,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
   }, [toast, refreshTemplates]);
 
   const handleExportTemplate = useCallback((template: CSVTemplate) => {
-    const csvContent = template.headers.join(',') + '\n';
+    const csvContent = template.columns.map(col => col.name).join(',') + '\n';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     
     const link = document.createElement('a');
@@ -331,14 +335,14 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
                       <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
                     )}
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {template.headers.slice(0, 6).map((header, index) => (
+                      {template.columns.slice(0, 6).map((column, index) => (
                         <Badge key={index} variant="outline" className="text-xs">
-                          {header}
+                          {column.name}
                         </Badge>
                       ))}
-                      {template.headers.length > 6 && (
+                      {template.columns.length > 6 && (
                         <Badge variant="outline" className="text-xs">
-                          +{template.headers.length - 6} weitere
+                          +{template.columns.length - 6} weitere
                         </Badge>
                       )}
                     </div>
@@ -381,7 +385,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
                 </div>
                 
                 <div className="text-xs text-muted-foreground">
-                  Erstellt: {template.created.toLocaleDateString('de-DE')} • {template.headers.length} Spalten
+                  {template.columns.length} Spalten
                 </div>
               </div>
             ))}

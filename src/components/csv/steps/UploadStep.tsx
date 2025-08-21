@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FileText, Upload, X, Eye } from 'lucide-react';
 import FileUpload from '../../FileUpload';
+import DataPreview from '../../DataPreview';
 import { CSVFile } from '@/lib/transformationEngine';
 
 interface UploadStepProps {
@@ -21,6 +22,14 @@ const UploadStep: React.FC<UploadStepProps> = ({
   onPreviewFile,
   onNext
 }) => {
+  const [previewFile, setPreviewFile] = useState<CSVFile | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const handlePreviewFile = (file: CSVFile) => {
+    setPreviewFile(file);
+    setIsPreviewOpen(true);
+    onPreviewFile(file);
+  };
   return (
     <div className="space-y-6">
       <Card className="shadow-elegant">
@@ -76,7 +85,7 @@ const UploadStep: React.FC<UploadStepProps> = ({
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => onPreviewFile(file)}
+                            onClick={() => handlePreviewFile(file)}
                           >
                             <Eye className="w-4 h-4 mr-2" />
                             Vorschau
@@ -108,6 +117,12 @@ const UploadStep: React.FC<UploadStepProps> = ({
           )}
         </CardContent>
       </Card>
+      
+      <DataPreview 
+        file={previewFile}
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+      />
     </div>
   );
 };
