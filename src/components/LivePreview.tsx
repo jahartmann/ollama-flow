@@ -37,6 +37,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({
         sourceFiles: recipe.sourceFiles || [],
         columnMappings: recipe.columnMappings || [],
         newColumns: recipe.newColumns || [],
+        templateMappings: recipe.templateMappings || [],
         mergeStrategy: recipe.mergeStrategy || 'append',
         joinColumn: recipe.joinColumn,
         created: new Date()
@@ -72,7 +73,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({
   }
 
   return (
-    <Card className="shadow-elegant">
+    <Card className="shadow-elegant h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Eye className="w-5 h-5" />
@@ -102,7 +103,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({
               </span>
             </div>
             
-            <div className="overflow-auto max-h-96 border rounded">
+            <div className="overflow-auto max-h-[600px] border rounded">
               <table className="w-full text-sm">
                 <thead className="bg-muted sticky top-0">
                   <tr>

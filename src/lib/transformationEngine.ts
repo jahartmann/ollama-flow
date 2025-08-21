@@ -20,6 +20,23 @@ export interface NewColumn {
   conditions?: ConditionalRule[]; // For conditional logic
 }
 
+export interface CSVTemplate {
+  id: string;
+  name: string;
+  headers: string[];
+  description?: string;
+  created: Date;
+}
+
+export interface TemplateColumnMapping {
+  targetColumn: string; // Column name in the template
+  sourceType: 'column' | 'formula' | 'fixed' | 'conditional';
+  sourceColumn?: string; // For direct column mapping
+  formula?: string; // For formula-based mapping
+  fixedValue?: string; // For fixed values
+  conditions?: ConditionalRule[]; // For conditional logic
+}
+
 export interface ConditionalRule {
   condition: string; // e.g., "[role] === 'Lehrer'"
   value: string; // What to fill if condition is true
@@ -32,6 +49,8 @@ export interface TransformationRecipe {
   sourceFiles: string[]; // Expected file names/patterns
   columnMappings: ColumnMapping[];
   newColumns: NewColumn[];
+  templateId?: string; // Reference to a CSV template
+  templateMappings: TemplateColumnMapping[]; // Template-based column mappings
   mergeStrategy?: 'append' | 'join'; // How to combine multiple files
   joinColumn?: string; // Column to join on if using join strategy
   created: Date;
@@ -40,15 +59,57 @@ export interface TransformationRecipe {
 
 export class TransformationEngine {
   private recipes: TransformationRecipe[] = [];
+  private templates: CSVTemplate[] = [];
 
   constructor() {
     this.loadRecipes();
+    this.loadTemplates();
+  }
+
+  // Template Management
+  saveTemplate(template: Omit<CSVTemplate, 'id' | 'created'>): CSVTemplate {
+    const newTemplate: CSVTemplate = {
+      ...template,
+      id: this.generateId(),
+      created: new Date()
+    };
+    
+    this.templates.push(newTemplate);
+    this.persistTemplates();
+    return newTemplate;
+  }
+
+  getTemplates(): CSVTemplate[] {
+    return [...this.templates];
+  }
+
+  getTemplate(id: string): CSVTemplate | undefined {
+    return this.templates.find(t => t.id === id);
+  }
+
+  deleteTemplate(id: string): boolean {
+    const index = this.templates.findIndex(t => t.id === id);
+    if (index !== -1) {
+      this.templates.splice(index, 1);
+      this.persistTemplates();
+      return true;
+    }
+    return false;
+  }
+
+  createTemplateFromCSV(csvFile: CSVFile, name: string, description?: string): CSVTemplate {
+    return this.saveTemplate({
+      name,
+      description,
+      headers: csvFile.headers
+    });
   }
 
   // Recipe Management
   saveRecipe(recipe: Omit<TransformationRecipe, 'id' | 'created'>): TransformationRecipe {
     const newRecipe: TransformationRecipe = {
       ...recipe,
+      templateMappings: recipe.templateMappings || [],
       id: this.generateId(),
       created: new Date()
     };
@@ -100,11 +161,19 @@ export class TransformationEngine {
         workingData = this.mergeFiles(files, recipe);
       }
 
-      // Step 2: Apply column mappings (rename columns)
-      workingData = this.applyColumnMappings(workingData, recipe.columnMappings);
+      // Step 2: Apply template-based transformation if template is specified
+      if (recipe.templateId && recipe.templateMappings.length > 0) {
+        const template = this.getTemplate(recipe.templateId);
+        if (template) {
+          workingData = this.applyTemplateTransformation(workingData, template, recipe.templateMappings);
+        }
+      } else {
+        // Step 2 (fallback): Apply column mappings (rename columns)
+        workingData = this.applyColumnMappings(workingData, recipe.columnMappings);
 
-      // Step 3: Add new columns
-      workingData = this.addNewColumns(workingData, recipe.newColumns);
+        // Step 3 (fallback): Add new columns
+        workingData = this.addNewColumns(workingData, recipe.newColumns);
+      }
 
       this.updateRecipeUsage(recipe.id);
 
@@ -253,6 +322,57 @@ export class TransformationEngine {
     };
   }
 
+  private applyTemplateTransformation(file: CSVFile, template: CSVTemplate, mappings: TemplateColumnMapping[]): CSVFile {
+    const transformedData: string[][] = [];
+    
+    // Create headers based on template
+    const newHeaders = [...template.headers];
+    
+    // Transform each row according to template mappings
+    file.data.forEach(row => {
+      const newRow: string[] = [];
+      
+      template.headers.forEach(templateColumn => {
+        const mapping = mappings.find(m => m.targetColumn === templateColumn);
+        let value = '';
+        
+        if (mapping) {
+          switch (mapping.sourceType) {
+            case 'column':
+              if (mapping.sourceColumn) {
+                const sourceIndex = file.headers.indexOf(mapping.sourceColumn);
+                value = sourceIndex !== -1 ? (row[sourceIndex] || '') : '';
+              }
+              break;
+              
+            case 'formula':
+              value = this.evaluateFormula(mapping.formula || '', row, file.headers);
+              break;
+              
+            case 'fixed':
+              value = mapping.fixedValue || '';
+              break;
+              
+            case 'conditional':
+              value = this.evaluateConditional(mapping.conditions || [], row, file.headers);
+              break;
+          }
+        }
+        
+        newRow.push(value);
+      });
+      
+      transformedData.push(newRow);
+    });
+
+    return {
+      ...file,
+      headers: newHeaders,
+      data: transformedData,
+      name: `${file.name}_template_${template.name}`
+    };
+  }
+
   private evaluateFormula(formula: string, row: string[], headers: string[]): string {
     // Support Excel-like formulas: =A1&"@domain.com" or =[firstName]&"@"&[domain]
     let result = formula.trim();
@@ -362,6 +482,30 @@ export class TransformationEngine {
       localStorage.setItem('transformation-recipes', JSON.stringify(this.recipes));
     } catch (error) {
       console.error('Failed to save recipes:', error);
+    }
+  }
+
+  private loadTemplates(): void {
+    try {
+      const stored = localStorage.getItem('csv-templates');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        this.templates = parsed.map((template: any) => ({
+          ...template,
+          created: new Date(template.created)
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load templates:', error);
+      this.templates = [];
+    }
+  }
+
+  private persistTemplates(): void {
+    try {
+      localStorage.setItem('csv-templates', JSON.stringify(this.templates));
+    } catch (error) {
+      console.error('Failed to save templates:', error);
     }
   }
 }

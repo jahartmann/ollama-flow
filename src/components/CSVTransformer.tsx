@@ -28,10 +28,12 @@ import {
   type TransformationRecipe,
   type ColumnMapping,
   type NewColumn,
-  type ConditionalRule
+  type ConditionalRule,
+  type CSVTemplate
 } from '@/lib/transformationEngine';
 import { useToast } from '@/hooks/use-toast';
 import LivePreview from '@/components/LivePreview';
+import TemplateManager from '@/components/TemplateManager';
 
 const CSVTransformer = () => {
   const [csvFiles, setCsvFiles] = useState<CSVFile[]>([]);
@@ -41,11 +43,13 @@ const CSVTransformer = () => {
     sourceFiles: [],
     columnMappings: [],
     newColumns: [],
-    mergeStrategy: 'append'
+    mergeStrategy: 'append',
+    templateMappings: []
   });
   const [selectedRecipeId, setSelectedRecipeId] = useState<string>('');
   const [transformedData, setTransformedData] = useState<CSVFile | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<CSVTemplate | null>(null);
   const { toast } = useToast();
 
   const recipes = transformationEngine.getRecipes();
@@ -112,6 +116,7 @@ const CSVTransformer = () => {
         sourceFiles: currentRecipe.sourceFiles || [],
         columnMappings: currentRecipe.columnMappings || [],
         newColumns: currentRecipe.newColumns || [],
+        templateMappings: currentRecipe.templateMappings || [],
         mergeStrategy: currentRecipe.mergeStrategy || 'append',
         joinColumn: currentRecipe.joinColumn
       });
@@ -127,6 +132,7 @@ const CSVTransformer = () => {
         sourceFiles: [],
         columnMappings: [],
         newColumns: [],
+        templateMappings: [],
         mergeStrategy: 'append'
       });
 
@@ -159,10 +165,11 @@ const CSVTransformer = () => {
         setCurrentRecipe({
           name: '',
           description: '',
-          sourceFiles: [],
-          columnMappings: [],
-          newColumns: [],
-          mergeStrategy: 'append'
+        sourceFiles: [],
+        columnMappings: [],
+        newColumns: [],
+        templateMappings: [],
+        mergeStrategy: 'append'
         });
       }
     }
@@ -310,8 +317,9 @@ const CSVTransformer = () => {
       </div>
 
       <Tabs defaultValue="files" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="files">Dateien laden</TabsTrigger>
+          <TabsTrigger value="template">Template</TabsTrigger>
           <TabsTrigger value="recipe">Rezept erstellen</TabsTrigger>
           <TabsTrigger value="recipes">Gespeicherte Rezepte</TabsTrigger>
           <TabsTrigger value="result">Ergebnis</TabsTrigger>
@@ -391,6 +399,144 @@ const CSVTransformer = () => {
           </div>
         </TabsContent>
 
+        {/* Template Tab */}
+        <TabsContent value="template">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <TemplateManager onTemplateSelect={setSelectedTemplate} />
+            
+            {selectedTemplate && (
+              <Card className="shadow-elegant">
+                <CardHeader>
+                  <CardTitle>Template-Mapping: {selectedTemplate.name}</CardTitle>
+                  <CardDescription>
+                    Definieren Sie für jede Template-Spalte, welche Daten verwendet werden sollen
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {selectedTemplate.headers.map((header, index) => (
+                      <div key={index} className="p-3 border rounded space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="font-medium">{header}</Label>
+                          <Badge variant="outline">
+                            {String.fromCharCode(65 + index)}1
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                          <Select
+                            value={currentRecipe.templateMappings?.find(m => m.targetColumn === header)?.sourceType || ''}
+                            onValueChange={(value) => {
+                              const newMappings = [...(currentRecipe.templateMappings || [])];
+                              const existingIndex = newMappings.findIndex(m => m.targetColumn === header);
+                              
+                              if (existingIndex !== -1) {
+                                newMappings[existingIndex] = { 
+                                  ...newMappings[existingIndex], 
+                                  sourceType: value as any 
+                                };
+                              } else {
+                                newMappings.push({ 
+                                  targetColumn: header, 
+                                  sourceType: value as any 
+                                });
+                              }
+                              
+                              setCurrentRecipe(prev => ({ 
+                                ...prev, 
+                                templateId: selectedTemplate.id,
+                                templateMappings: newMappings 
+                              }));
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Quelle wählen" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover border-border shadow-lg z-50">
+                              <SelectItem value="column">Spalte</SelectItem>
+                              <SelectItem value="formula">Formel</SelectItem>
+                              <SelectItem value="fixed">Fester Wert</SelectItem>
+                              <SelectItem value="conditional">Bedingt</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          
+                          {(() => {
+                            const mapping = currentRecipe.templateMappings?.find(m => m.targetColumn === header);
+                            const updateMapping = (field: string, value: any) => {
+                              const newMappings = [...(currentRecipe.templateMappings || [])];
+                              const existingIndex = newMappings.findIndex(m => m.targetColumn === header);
+                              
+                              if (existingIndex !== -1) {
+                                newMappings[existingIndex] = { 
+                                  ...newMappings[existingIndex], 
+                                  [field]: value 
+                                };
+                              } else {
+                                newMappings.push({ 
+                                  targetColumn: header, 
+                                  sourceType: 'column',
+                                  [field]: value 
+                                });
+                              }
+                              
+                              setCurrentRecipe(prev => ({ 
+                                ...prev, 
+                                templateId: selectedTemplate.id,
+                                templateMappings: newMappings 
+                              }));
+                            };
+                            
+                            switch (mapping?.sourceType) {
+                              case 'column':
+                                return (
+                                  <Select
+                                    value={mapping.sourceColumn || ''}
+                                    onValueChange={(value) => updateMapping('sourceColumn', value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Quell-Spalte" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-popover border-border shadow-lg z-50">
+                                      {csvFiles.flatMap(file => 
+                                        file.headers.map(h => (
+                                          <SelectItem key={`${file.id}-${h}`} value={h}>
+                                            {h} ({file.name})
+                                          </SelectItem>
+                                        ))
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                );
+                              case 'formula':
+                                return (
+                                  <Input
+                                    value={mapping.formula || ''}
+                                    onChange={(e) => updateMapping('formula', e.target.value)}
+                                    placeholder='=A1&"@domain.com"'
+                                  />
+                                );
+                              case 'fixed':
+                                return (
+                                  <Input
+                                    value={mapping.fixedValue || ''}
+                                    onChange={(e) => updateMapping('fixedValue', e.target.value)}
+                                    placeholder="Fester Wert"
+                                  />
+                                );
+                              default:
+                                return <div className="h-9" />;
+                            }
+                          })()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
         {/* Recipe Creation Tab */}
         <TabsContent value="recipe">
           <div className="space-y-6">
@@ -453,10 +599,10 @@ const CSVTransformer = () => {
                   </CardContent>
                 </Card>
               </div>
-              
-              <div>
-                <LivePreview files={csvFiles} recipe={currentRecipe} maxRows={5} />
-              </div>
+            </div>
+            
+            <div className="mt-6">
+              <LivePreview files={csvFiles} recipe={currentRecipe} maxRows={10} />
             </div>
 
             {/* Column Mappings */}
