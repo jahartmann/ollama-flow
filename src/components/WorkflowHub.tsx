@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,47 +17,18 @@ import {
   Zap
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { workflowStorage, type SavedWorkflow } from '@/lib/workflowStorage';
 
-interface SavedWorkflow {
-  id: string;
-  name: string;
-  description: string;
-  steps: number;
-  lastUsed: Date;
-  category: 'cleaning' | 'transformation' | 'analysis' | 'custom';
-}
 
 const WorkflowHub = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  // Mock data - in real app this would come from storage/API
-  const [workflows, setWorkflows] = useState<SavedWorkflow[]>([
-    {
-      id: '1',
-      name: 'Kunden-Datenmigration',
-      description: 'Bereinigung und Normalisierung von Kundendaten mit E-Mail-Validierung',
-      steps: 8,
-      lastUsed: new Date('2024-01-15'),
-      category: 'cleaning'
-    },
-    {
-      id: '2',
-      name: 'Produktkatalog-Transformation',
-      description: 'Konvertierung von Legacy-Produktdaten in neues Schema',
-      steps: 12,
-      lastUsed: new Date('2024-01-10'),
-      category: 'transformation'
-    },
-    {
-      id: '3',
-      name: 'Verkaufsdaten-Analyse',
-      description: 'Aggregation und Pivot-Analyse von Verkaufsdaten',
-      steps: 6,
-      lastUsed: new Date('2024-01-08'),
-      category: 'analysis'
-    }
-  ]);
+  const [workflows, setWorkflows] = useState<SavedWorkflow[]>([]);
+
+  useEffect(() => {
+    setWorkflows(workflowStorage.getWorkflows());
+  }, []);
 
   const categories = [
     { value: 'all', label: 'Alle Workflows', icon: Workflow },
@@ -82,28 +53,33 @@ const WorkflowHub = () => {
     }
   };
 
-  const handleRunWorkflow = (workflowId: string) => {
-    console.log('Running workflow:', workflowId);
+  const handleRunWorkflow = async (workflowId: string) => {
+    try {
+      // For now, just create a mock execution
+      const execution = await workflowStorage.executeWorkflow(workflowId, []);
+      console.log('Workflow execution started:', execution);
+      
+      // Refresh workflows to update lastUsed
+      setWorkflows(workflowStorage.getWorkflows());
+    } catch (error) {
+      console.error('Failed to run workflow:', error);
+    }
   };
 
   const handleEditWorkflow = (workflowId: string) => {
-    console.log('Editing workflow:', workflowId);
+    // Navigate to visual editor with workflow loaded
+    window.location.href = `/editor?workflow=${workflowId}`;
   };
 
   const handleDeleteWorkflow = (workflowId: string) => {
-    setWorkflows(prev => prev.filter(w => w.id !== workflowId));
+    workflowStorage.deleteWorkflow(workflowId);
+    setWorkflows(workflowStorage.getWorkflows());
   };
 
   const handleDuplicateWorkflow = (workflowId: string) => {
-    const workflow = workflows.find(w => w.id === workflowId);
-    if (workflow) {
-      const newWorkflow = {
-        ...workflow,
-        id: Date.now().toString(),
-        name: `${workflow.name} (Kopie)`,
-        lastUsed: new Date()
-      };
-      setWorkflows(prev => [...prev, newWorkflow]);
+    const duplicated = workflowStorage.duplicateWorkflow(workflowId);
+    if (duplicated) {
+      setWorkflows(workflowStorage.getWorkflows());
     }
   };
 
@@ -195,14 +171,14 @@ const WorkflowHub = () => {
             
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Zap className="w-3 h-3" />
-                  {workflow.steps} Schritte
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {workflow.lastUsed.toLocaleDateString('de-DE')}
-                </span>
+                 <span className="flex items-center gap-1">
+                   <Zap className="w-3 h-3" />
+                   {workflow.steps.length} Schritte
+                 </span>
+                 <span className="flex items-center gap-1">
+                   <Clock className="w-3 h-3" />
+                   {new Date(workflow.lastUsed).toLocaleDateString('de-DE')}
+                 </span>
               </div>
               
               <div className="flex gap-2">

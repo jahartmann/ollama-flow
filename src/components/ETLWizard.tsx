@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AlertCircle, CheckCircle2, Database, FileText, Settings, Zap } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ollamaAPI } from '@/lib/ollamaApi';
+import { workflowStorage } from '@/lib/workflowStorage';
 
 interface SourceFile {
   name: string;
@@ -63,55 +65,86 @@ const ETLWizard = () => {
   };
 
   const testOllamaConnection = async () => {
-    // Mock connection test
-    setTimeout(() => {
-      setPlan(prev => ({ ...prev, ollamaConnected: true }));
-    }, 1000);
+    try {
+      const isConnected = await ollamaAPI.testConnection();
+      setPlan(prev => ({ ...prev, ollamaConnected: isConnected }));
+    } catch (error) {
+      setPlan(prev => ({ ...prev, ollamaConnected: false }));
+    }
   };
 
-  const generatePlan = () => {
-    // Mock plan generation
-    const mockPlan = {
-      modules: [
-        {
-          type: "csv_reader",
-          config: {
-            files: plan.sourceFiles.map(f => ({ path: f.name, encoding: f.encoding }))
+  const generatePlan = async () => {
+    if (!plan.ollamaConnected) return;
+
+    try {
+      const prompt = `Erstelle einen ETL-Transformationsplan basierend auf folgenden Spezifikationen:
+
+Quelldateien:
+${plan.sourceFiles.map(f => `- ${f.name} (Spalten: ${f.columns}, Kodierung: ${f.encoding})`).join('\n')}
+
+Zieldatei: ${plan.targetFile}
+Zielspalten: ${plan.targetColumns}
+
+Transformationen:
+- Vergleich: ${plan.transformations.comparison}
+- Bereinigung: ${plan.transformations.cleaning}
+- Zusammenführung: ${plan.transformations.merging}
+- Mapping: ${plan.transformations.mapping}
+- Logik: ${plan.transformations.logic}
+
+Generiere eine detaillierte JSON-Konfiguration mit Modulen für CSV-Reader, Datenvergleich, Bereinigung, Merger und Writer.`;
+
+      const response = await ollamaAPI.generateCompletion(prompt);
+      
+      // Try to extract JSON from response
+      let planData;
+      try {
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        planData = jsonMatch ? JSON.parse(jsonMatch[0]) : { error: 'Kein gültiges JSON generiert', raw: response };
+      } catch (e) {
+        planData = { error: 'JSON Parse Error', raw: response };
+      }
+
+      setGeneratedPlan(JSON.stringify(planData, null, 2));
+      setStep(5);
+
+      // Save as workflow
+      const workflow = {
+        name: `ETL Plan - ${plan.targetFile}`,
+        description: 'Automatisch generierter ETL-Plan',
+        category: 'transformation' as const,
+        steps: [
+          {
+            id: '1',
+            type: 'source' as const,
+            name: 'CSV Import',
+            config: { files: plan.sourceFiles },
+            position: { x: 50, y: 100 }
+          },
+          {
+            id: '2',
+            type: 'transform' as const,
+            name: 'Datenverarbeitung',
+            config: { transformations: plan.transformations },
+            position: { x: 250, y: 100 }
+          },
+          {
+            id: '3',
+            type: 'output' as const,
+            name: 'CSV Export',
+            config: { outputFile: plan.targetFile, columns: plan.targetColumns },
+            position: { x: 450, y: 100 }
           }
-        },
-        {
-          type: "data_comparison",
-          config: {
-            primary_file: plan.sourceFiles[0]?.name || "",
-            secondary_file: plan.sourceFiles[1]?.name || "",
-            key_column: "ID"
-          }
-        },
-        {
-          type: "data_cleaning",
-          config: {
-            rules: plan.transformations.cleaning.split('\n').filter(r => r.trim())
-          }
-        },
-        {
-          type: "data_merger",
-          config: {
-            strategy: "inner_join",
-            output_columns: plan.targetColumns.split(',').map(c => c.trim())
-          }
-        },
-        {
-          type: "csv_writer",
-          config: {
-            output_file: plan.targetFile,
-            encoding: "UTF-8"
-          }
-        }
-      ]
-    };
-    
-    setGeneratedPlan(JSON.stringify(mockPlan, null, 2));
-    setStep(5);
+        ],
+        mappings: []
+      };
+
+      workflowStorage.saveWorkflow(workflow);
+    } catch (error) {
+      console.error('Fehler bei der Plan-Generierung:', error);
+      setGeneratedPlan(JSON.stringify({ error: 'Plan-Generierung fehlgeschlagen', details: error instanceof Error ? error.message : 'Unbekannter Fehler' }, null, 2));
+      setStep(5);
+    }
   };
 
   const steps = [

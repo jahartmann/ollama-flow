@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { workflowStorage, type WorkflowStep, type FieldMapping } from '@/lib/workflowStorage';
 import { 
   Plus,
   ArrowRight,
@@ -20,19 +21,6 @@ import {
   FileOutput
 } from 'lucide-react';
 
-interface WorkflowStep {
-  id: string;
-  type: 'source' | 'transform' | 'filter' | 'output';
-  name: string;
-  config: Record<string, any>;
-  position: { x: number; y: number };
-}
-
-interface FieldMapping {
-  source: string;
-  target: string;
-  transformation?: string;
-}
 
 const VisualWorkflowEditor = () => {
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([
@@ -109,20 +97,36 @@ const VisualWorkflowEditor = () => {
   };
 
   const saveWorkflow = () => {
-    const workflow = {
-      name: workflowName,
-      steps: workflowSteps,
-      mappings: fieldMappings,
-      created: new Date().toISOString()
-    };
-    
-    console.log('Saving workflow:', workflow);
-    // In real app, save to storage/API
+    try {
+      const workflow = {
+        name: workflowName,
+        description: `Workflow mit ${workflowSteps.length} Schritten`,
+        category: 'custom' as const,
+        steps: workflowSteps,
+        mappings: fieldMappings
+      };
+      
+      const saved = workflowStorage.saveWorkflow(workflow);
+      console.log('Workflow gespeichert:', saved);
+    } catch (error) {
+      console.error('Fehler beim Speichern:', error);
+    }
   };
 
-  const runWorkflow = () => {
-    console.log('Running workflow:', { steps: workflowSteps, mappings: fieldMappings });
-    // In real app, execute workflow
+  const runWorkflow = async () => {
+    try {
+      // Save first, then execute
+      saveWorkflow();
+      const workflows = workflowStorage.getWorkflows();
+      const currentWorkflow = workflows.find(w => w.name === workflowName);
+      
+      if (currentWorkflow) {
+        const execution = await workflowStorage.executeWorkflow(currentWorkflow.id, []);
+        console.log('Workflow-Ausführung gestartet:', execution);
+      }
+    } catch (error) {
+      console.error('Fehler bei der Ausführung:', error);
+    }
   };
 
   const selectedStepData = workflowSteps.find(step => step.id === selectedStep);

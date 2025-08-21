@@ -17,17 +17,14 @@ import {
   Brain
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { fileProcessor, type ParsedFile } from '@/lib/fileProcessor';
+import { ollamaAPI } from '@/lib/ollamaApi';
 
-interface FileUpload {
-  id: string;
+interface FileUpload extends ParsedFile {
   file: File;
-  encoding: string;
-  delimiter: string;
-  hasHeader: boolean;
-  previewData: string[][];
-  columns: string[];
   status: 'uploaded' | 'parsing' | 'ready' | 'error';
   errorMessage?: string;
+  previewData: string[][];
 }
 
 const DataPreview = () => {
@@ -57,11 +54,15 @@ const DataPreview = () => {
       const fileUpload: FileUpload = {
         id: Date.now().toString() + Math.random(),
         file,
+        name: file.name,
+        columns: [],
+        data: [],
+        rowCount: 0,
+        size: file.size,
         encoding: 'utf-8',
         delimiter: ',',
         hasHeader: true,
         previewData: [],
-        columns: [],
         status: 'uploaded'
       };
       
@@ -76,19 +77,19 @@ const DataPreview = () => {
     );
 
     try {
-      // Mock file parsing - in real app would use FileReader with encoding
-      const text = await fileUpload.file.text();
-      const lines = text.split('\n').slice(0, 6); // Preview first 5 rows + header
-      const data = lines.map(line => line.split(fileUpload.delimiter));
-      
-      const columns = fileUpload.hasHeader ? data[0] : data[0].map((_, i) => `Spalte ${i + 1}`);
-      const previewData = fileUpload.hasHeader ? data.slice(1) : data;
+      const parsedFile = await fileProcessor.parseCSVFile(fileUpload.file, {
+        encoding: fileUpload.encoding,
+        delimiter: fileUpload.delimiter,
+        hasHeader: fileUpload.hasHeader
+      });
 
+      const previewData = parsedFile.data.slice(0, 5); // Show first 5 rows
+      
       setUploadedFiles(prev => 
         prev.map(f => f.id === fileUpload.id ? {
           ...f,
+          ...parsedFile,
           previewData,
-          columns,
           status: 'ready'
         } : f)
       );
@@ -101,7 +102,7 @@ const DataPreview = () => {
         prev.map(f => f.id === fileUpload.id ? {
           ...f,
           status: 'error',
-          errorMessage: 'Fehler beim Parsen der Datei'
+          errorMessage: error instanceof Error ? error.message : 'Unbekannter Fehler'
         } : f)
       );
     }
@@ -121,13 +122,33 @@ const DataPreview = () => {
   const handleAiProcess = async () => {
     if (!aiPrompt.trim() || !activeFileId) return;
     
+    const activeFile = uploadedFiles.find(f => f.id === activeFileId);
+    if (!activeFile) return;
+
     setIsProcessingAi(true);
     
-    // Mock AI processing - in real app would call Ollama API
-    setTimeout(() => {
+    try {
+      const result = await ollamaAPI.processDataTransformation(
+        [activeFile.columns, ...activeFile.previewData],
+        aiPrompt
+      );
+
+      // Update the file with transformed data
+      setUploadedFiles(prev => 
+        prev.map(f => f.id === activeFileId ? {
+          ...f,
+          data: result.transformedData,
+          previewData: result.transformedData.slice(0, 5)
+        } : f)
+      );
+
+      // Show explanation in console for now
+      console.log('AI Transformation Result:', result.explanation);
+    } catch (error) {
+      console.error('AI processing failed:', error);
+    } finally {
       setIsProcessingAi(false);
-      // Could update preview data based on AI processing
-    }, 2000);
+    }
   };
 
   const activeFile = uploadedFiles.find(f => f.id === activeFileId);

@@ -18,34 +18,11 @@ import {
   Sliders
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ollamaAPI, type OllamaModel, type OllamaConfig } from '@/lib/ollamaApi';
 
-interface OllamaModel {
-  name: string;
-  size: string;
-  modified: string;
-  digest: string;
-}
-
-interface OllamaConfig {
-  serverUrl: string;
-  port: string;
-  selectedModel: string;
-  temperature: number;
-  topP: number;
-  maxTokens: number;
-  repeatPenalty: number;
-}
 
 const OllamaSettings = () => {
-  const [config, setConfig] = useState<OllamaConfig>({
-    serverUrl: 'http://localhost',
-    port: '11434',
-    selectedModel: '',
-    temperature: 0.7,
-    topP: 0.9,
-    maxTokens: 2048,
-    repeatPenalty: 1.1
-  });
+  const [config, setConfig] = useState<OllamaConfig>(ollamaAPI.getConfig());
 
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [availableModels, setAvailableModels] = useState<OllamaModel[]>([]);
@@ -53,81 +30,64 @@ const OllamaSettings = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  // Mock data for demonstration
-  const mockModels: OllamaModel[] = [
-    {
-      name: 'llama3.2:latest',
-      size: '2.0 GB',
-      modified: '2024-01-15',
-      digest: 'abc123'
-    },
-    {
-      name: 'mistral:7b',
-      size: '4.1 GB', 
-      modified: '2024-01-10',
-      digest: 'def456'
-    },
-    {
-      name: 'phi3:medium',
-      size: '7.9 GB',
-      modified: '2024-01-08',
-      digest: 'ghi789'
-    }
-  ];
 
   const testConnection = async () => {
     setConnectionStatus('connecting');
     setErrorMessage('');
     
     try {
-      // Mock API call - in real app would fetch from Ollama API
-      const fullUrl = `${config.serverUrl}:${config.port}`;
+      ollamaAPI.saveConfig(config);
+      const isConnected = await ollamaAPI.testConnection();
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock success
-      setConnectionStatus('connected');
-      await loadModels();
-      
+      if (isConnected) {
+        setConnectionStatus('connected');
+        await loadModels();
+      } else {
+        setConnectionStatus('error');
+        setErrorMessage('Verbindung fehlgeschlagen. Stellen Sie sicher, dass Ollama läuft und die URL korrekt ist.');
+      }
     } catch (error) {
       setConnectionStatus('error');
-      setErrorMessage('Verbindung fehlgeschlagen. Stellen Sie sicher, dass Ollama läuft und die URL korrekt ist.');
+      setErrorMessage(`Verbindungsfehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     }
   };
 
   const loadModels = async () => {
-    if (connectionStatus !== 'connected') return;
-    
     setIsLoadingModels(true);
     
     try {
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setAvailableModels(mockModels);
+      const models = await ollamaAPI.getModels();
+      setAvailableModels(models);
       
-      if (mockModels.length > 0 && !config.selectedModel) {
-        setConfig(prev => ({ ...prev, selectedModel: mockModels[0].name }));
+      if (models.length > 0 && !config.selectedModel) {
+        const updatedConfig = { ...config, selectedModel: models[0].name };
+        setConfig(updatedConfig);
+        ollamaAPI.saveConfig(updatedConfig);
       }
     } catch (error) {
       console.error('Fehler beim Laden der Modelle:', error);
+      setErrorMessage(`Fehler beim Laden der Modelle: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     } finally {
       setIsLoadingModels(false);
     }
   };
 
   const handleConfigChange = (field: keyof OllamaConfig, value: any) => {
-    setConfig(prev => ({ ...prev, [field]: value }));
+    const updatedConfig = { ...config, [field]: value };
+    setConfig(updatedConfig);
+    ollamaAPI.saveConfig(updatedConfig);
   };
 
   const resetToDefaults = () => {
-    setConfig(prev => ({
-      ...prev,
+    const defaultConfig = {
+      ...config,
       temperature: 0.7,
       topP: 0.9,
       maxTokens: 2048,
       repeatPenalty: 1.1
-    }));
+    };
+    setConfig(defaultConfig);
+    ollamaAPI.saveConfig(defaultConfig);
   };
 
   const getConnectionStatusColor = () => {
