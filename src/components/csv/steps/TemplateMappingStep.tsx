@@ -239,14 +239,17 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
   };
 
   const handleAiMapping = async () => {
-    if (!sourceData || !selectedTemplate || !aiPrompt.trim()) {
+    if (!sourceData || !selectedTemplate) {
       toast({
-        title: "Eingabe erforderlich",
-        description: "Bitte beschreiben Sie, wie die Felder gemappt werden sollen",
+        title: "Fehler",
+        description: "Quelldaten und Template werden benötigt",
         variant: "destructive"
       });
       return;
     }
+
+    // If no prompt provided, use automatic mapping
+    const userInstruction = aiPrompt.trim() || "Mappe alle ähnlichen Felder automatisch basierend auf Spaltennamen";
 
     setIsAiProcessing(true);
     try {
@@ -256,14 +259,27 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
         throw new Error('Keine Verbindung zu Ollama. Stellen Sie sicher, dass Ollama läuft.');
       }
 
-      // Enhanced prompt for better AI mapping results
+      // Enhanced intelligent prompt for automatic mapping
       const mappingPrompt = `
-AUFGABE: Erstelle automatische Spalten-Mappings für CSV-Transformation
+AUFGABE: Intelligente automatische Spalten-Mappings für CSV-Transformation
 
 QUELLDATEN-SPALTEN: ${sourceData.headers.join(', ')}
 ZIEL-TEMPLATE-SPALTEN: ${selectedTemplate.columns?.map(c => c.name).join(', ')}
 
-BENUTZER-ANWEISUNG: ${aiPrompt}
+BENUTZER-ANWEISUNG: ${userInstruction}
+
+INTELLIGENTE MAPPING-REGELN:
+1. Erkenne ähnliche Spaltennamen (z.B. "Name" → "Vorname", "Email" → "E-Mail", "Tel" → "Telefon")
+2. Verwende Teilstring-Matching (z.B. "kunde_name" → "Name")
+3. Erkenne häufige Variationen (deutsch/englisch: "Phone" → "Telefon", "Address" → "Adresse")
+4. Automatische Transformationen: Telefonnummern formatieren, Namen normalisieren
+5. Hohe Confidence (>90) für exakte/ähnliche Matches, niedrige (<70) für unsichere
+
+BEISPIEL-MAPPINGS:
+- "Vorname" ↔ "Name", "FirstName", "fname"
+- "E-Mail" ↔ "Email", "Mail", "email_address"
+- "Telefon" ↔ "Phone", "Tel", "telefon_nr"
+- "Straße" ↔ "Street", "Address", "adresse"
 
 Erstelle eine JSON-Antwort im folgenden Format:
 {
@@ -276,10 +292,10 @@ Erstelle eine JSON-Antwort im folgenden Format:
       "confidence": 0-100
     }
   ],
-  "explanation": "Erklärung der Mappings"
+  "explanation": "Erklärung der automatischen Mappings"
 }
 
-Wichtig: Verwende nur existierende Spaltennamen. Bei unsicheren Mappings setze confidence < 80.
+Wichtig: Verwende nur existierende Spaltennamen. Mappe so viele Felder wie möglich automatisch.
       `;
 
       const result = await ollamaAPI.generateCompletion(mappingPrompt);
@@ -421,33 +437,33 @@ Wichtig: Verwende nur existierende Spaltennamen. Bei unsicheren Mappings setze c
             <Card>
               <CardContent className="p-4">
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">KI-Mapping Anweisungen</label>
-                    <Textarea
-                      placeholder="z.B.: 'Mappe Vorname und Nachname zu einem Vollname-Feld', 'Konvertiere alle Telefonnummern in deutsches Format', 'Filtere nur aktive Kunden'"
-                      value={aiPrompt}
-                      onChange={(e) => setAiPrompt(e.target.value)}
-                      className="min-h-[80px]"
-                    />
-                  </div>
-                  <Button
-                    onClick={handleAiMapping}
-                    disabled={isAiProcessing || !aiPrompt.trim()}
-                    variant="outline"
-                    size="sm"
-                  >
-                    {isAiProcessing ? (
-                      <>
-                        <Brain className="w-4 h-4 mr-2 animate-pulse" />
-                        KI arbeitet...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Automatisches Mapping
-                      </>
-                    )}
-                  </Button>
+                   <div>
+                     <label className="text-sm font-medium mb-2 block">KI-Mapping Anweisungen (optional)</label>
+                     <Textarea
+                       placeholder="Lassen Sie leer für automatisches Mapping oder geben Sie spezifische Anweisungen ein wie: 'Mappe alles so, dass es passt', 'Konvertiere Telefonnummern in deutsches Format', 'Nur aktive Kunden filtern'"
+                       value={aiPrompt}
+                       onChange={(e) => setAiPrompt(e.target.value)}
+                       className="min-h-[80px]"
+                     />
+                   </div>
+                   <Button
+                     onClick={handleAiMapping}
+                     disabled={isAiProcessing}
+                     variant="outline"
+                     size="sm"
+                   >
+                     {isAiProcessing ? (
+                       <>
+                         <Brain className="w-4 h-4 mr-2 animate-pulse" />
+                         KI arbeitet...
+                       </>
+                     ) : (
+                       <>
+                         <Sparkles className="w-4 h-4 mr-2" />
+                         Automatisches Mapping
+                       </>
+                     )}
+                   </Button>
                 </div>
               </CardContent>
             </Card>
