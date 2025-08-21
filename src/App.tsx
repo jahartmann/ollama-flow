@@ -9,11 +9,23 @@ import Settings from "@/components/Settings";
 import UpdateNotification from "@/components/UpdateNotification";
 import { useUpdateChecker } from "@/hooks/useUpdateChecker";
 import NotFound from "./pages/NotFound";
+import { CSVFile, TransformationRecipe } from "@/lib/transformationEngine";
+import { useState } from "react";
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { updateInfo, dismissUpdate } = useUpdateChecker();
+  const [transformedData, setTransformedData] = useState<CSVFile | null>(null);
+  const [recipes, setRecipes] = useState<TransformationRecipe[]>([]);
+
+  const handleTransform = (data: CSVFile) => {
+    setTransformedData(data);
+  };
+
+  const handleRecipesChange = (newRecipes: TransformationRecipe[]) => {
+    setRecipes(newRecipes);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -25,7 +37,15 @@ const AppContent = () => {
         />
       )}
       <Routes>
-        <Route path="/" element={<CSVTransformer />} />
+        <Route 
+          path="/" 
+          element={
+            <CSVTransformer 
+              onTransform={handleTransform}
+              onRecipesChange={handleRecipesChange}
+            />
+          } 
+        />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -31,9 +31,15 @@ import { useToast } from '@/hooks/use-toast';
 
 interface TemplateManagerProps {
   onTemplateSelect?: (template: CSVTemplate) => void;
+  onClose?: () => void;
+  onTemplateUpdate?: () => void;
 }
 
-const TemplateManager: React.FC<TemplateManagerProps> = ({ onTemplateSelect }) => {
+const TemplateManager: React.FC<TemplateManagerProps> = ({ 
+  onTemplateSelect, 
+  onClose, 
+  onTemplateUpdate 
+}) => {
   const [templates, setTemplates] = useState<CSVTemplate[]>(transformationEngine.getTemplates());
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -88,6 +94,8 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ onTemplateSelect }) =
       if (onTemplateSelect) {
         onTemplateSelect(template);
       }
+      
+      onTemplateUpdate?.();
     } catch (error) {
       toast({
         title: "Fehler",
@@ -134,6 +142,8 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ onTemplateSelect }) =
       if (onTemplateSelect) {
         onTemplateSelect(template);
       }
+      
+      onTemplateUpdate?.();
     } catch (error) {
       toast({
         title: "Import-Fehler",
@@ -200,6 +210,11 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ onTemplateSelect }) =
         <CardTitle className="flex items-center justify-between">
           CSV Templates ({templates.length})
           <div className="flex gap-2">
+            {onClose && (
+              <Button size="sm" variant="outline" onClick={onClose}>
+                Zurück
+              </Button>
+            )}
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">
