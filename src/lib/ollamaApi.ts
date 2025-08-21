@@ -52,47 +52,37 @@ class OllamaAPI {
     try {
       console.log('Testing Ollama connection to:', this.baseUrl);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-      // Try multiple endpoints to detect Ollama
-      const endpoints = ['/api/version', '/api/tags', '/'];
-      let lastError = null;
-
-      for (const endpoint of endpoints) {
-        try {
-          const response = await fetch(`${this.baseUrl}${endpoint}`, {
-            method: 'GET',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            signal: controller.signal,
-            mode: 'cors'
-          });
-          
-          console.log(`Testing ${endpoint}:`, response.status, response.statusText);
-          
-          if (response.ok) {
-            const data = await response.text();
-            console.log(`Successful response from ${endpoint}:`, data);
-            clearTimeout(timeoutId);
-            return true;
-          }
-        } catch (error) {
-          lastError = error;
-          console.log(`Failed ${endpoint}:`, error);
-          continue;
-        }
-      }
+      const response = await fetch(`${this.baseUrl}/api/version`, {
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        signal: controller.signal
+      });
       
       clearTimeout(timeoutId);
-      console.error('All endpoints failed. Last error:', lastError);
-      return false;
+      console.log('Version endpoint response:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Ollama version:', data);
+        return true;
+      }
+      
+      // If version fails, try tags endpoint
+      const tagsResponse = await fetch(`${this.baseUrl}/api/tags`, {
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        signal: controller.signal
+      });
+      
+      return tagsResponse.ok;
     } catch (error) {
       console.error('Connection test failed:', error);
-      if (error instanceof Error) {
-        console.error('Error details:', error.message);
-      }
       return false;
     }
   }
@@ -101,16 +91,14 @@ class OllamaAPI {
     try {
       console.log('Fetching models from:', `${this.baseUrl}/api/tags`);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
       const response = await fetch(`${this.baseUrl}/api/tags`, {
         method: 'GET',
         headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Content-Type': 'application/json'
         },
-        signal: controller.signal,
-        mode: 'cors'
+        signal: controller.signal
       });
       
       clearTimeout(timeoutId);
@@ -138,18 +126,25 @@ class OllamaAPI {
       }));
     } catch (error) {
       console.error('Failed to fetch models:', error);
-      if (error instanceof Error) {
-        console.error('Error details:', error.message);
-      }
       throw error;
     }
   }
 
   async generateCompletion(prompt: string, context?: string): Promise<string> {
     try {
+      if (!this.config.selectedModel) {
+        throw new Error('No model selected');
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        signal: controller.signal,
         body: JSON.stringify({
           model: this.config.selectedModel,
           prompt: context ? `${context}\n\n${prompt}` : prompt,
@@ -163,7 +158,12 @@ class OllamaAPI {
         })
       });
 
-      if (!response.ok) throw new Error('Generation failed');
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Generation failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
 
       const data = await response.json();
       return data.response || '';

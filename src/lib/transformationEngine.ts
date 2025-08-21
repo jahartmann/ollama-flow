@@ -254,20 +254,52 @@ export class TransformationEngine {
   }
 
   private evaluateFormula(formula: string, row: string[], headers: string[]): string {
-    let result = formula;
+    // Support Excel-like formulas: =A1&"@domain.com" or =[firstName]&"@"&[domain]
+    let result = formula.trim();
     
-    // Replace column references like [firstName] with actual values
+    // Remove leading = if present (Excel-style)
+    if (result.startsWith('=')) {
+      result = result.substring(1);
+    }
+    
+    // Replace column references
+    // Support both Excel-style (A1, B2) and named references ([columnName])
     headers.forEach((header, index) => {
-      const placeholder = `[${header}]`;
       const value = row[index] || '';
-      result = result.replace(new RegExp('\\[' + header + '\\]', 'g'), value);
+      
+      // Replace named references like [firstName]
+      const namedPlaceholder = `[${header}]`;
+      result = result.replace(new RegExp('\\[' + header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\]', 'g'), `"${value}"`);
+      
+      // Replace Excel-style references like A1, B1, etc.
+      const excelRef = this.getExcelColumnName(index + 1) + '1';
+      result = result.replace(new RegExp(excelRef, 'g'), `"${value}"`);
     });
     
-    // Handle simple string concatenation (remove quotes and + operators)
-    result = result.replace(/'/g, '').replace(/"/g, '');
-    result = result.replace(/\s*\+\s*/g, '');
+    // Handle string concatenation with & operator (Excel-style)
+    result = result.replace(/&/g, '+');
+    
+    // Evaluate the expression safely
+    try {
+      // Only allow safe operations: string concatenation and basic operations
+      if (/^["\w\s+().-]+$/.test(result.replace(/'/g, '"'))) {
+        return eval(result.replace(/'/g, '"')) || '';
+      }
+    } catch (error) {
+      console.warn('Formula evaluation failed:', error);
+    }
     
     return result;
+  }
+
+  private getExcelColumnName(columnNumber: number): string {
+    let columnName = '';
+    while (columnNumber > 0) {
+      columnNumber--; // Make it 0-indexed
+      columnName = String.fromCharCode(65 + (columnNumber % 26)) + columnName;
+      columnNumber = Math.floor(columnNumber / 26);
+    }
+    return columnName;
   }
 
   private evaluateConditional(conditions: ConditionalRule[], row: string[], headers: string[]): string {

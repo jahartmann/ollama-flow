@@ -31,6 +31,7 @@ import {
   type ConditionalRule
 } from '@/lib/transformationEngine';
 import { useToast } from '@/hooks/use-toast';
+import LivePreview from '@/components/LivePreview';
 
 const CSVTransformer = () => {
   const [csvFiles, setCsvFiles] = useState<CSVFile[]>([]);
@@ -394,61 +395,69 @@ const CSVTransformer = () => {
         <TabsContent value="recipe">
           <div className="space-y-6">
             {/* Recipe Basic Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Rezept-Informationen</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Rezept-Name</Label>
-                    <Input
-                      value={currentRecipe.name || ''}
-                      onChange={(e) => setCurrentRecipe(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="z.B. Schulverwaltung zu Relution"
-                    />
-                  </div>
-                  <div>
-                    <Label>Merge-Strategie</Label>
-                    <Select
-                      value={currentRecipe.mergeStrategy || 'append'}
-                      onValueChange={(value: 'append' | 'join') => 
-                        setCurrentRecipe(prev => ({ ...prev, mergeStrategy: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover border-border shadow-lg z-50">
-                        <SelectItem value="append">Anhängen (Append)</SelectItem>
-                        <SelectItem value="join">Verknüpfen (Join)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Rezept-Informationen</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Rezept-Name</Label>
+                        <Input
+                          value={currentRecipe.name || ''}
+                          onChange={(e) => setCurrentRecipe(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="z.B. Schulverwaltung zu Relution"
+                        />
+                      </div>
+                      <div>
+                        <Label>Merge-Strategie</Label>
+                        <Select
+                          value={currentRecipe.mergeStrategy || 'append'}
+                          onValueChange={(value: 'append' | 'join') => 
+                            setCurrentRecipe(prev => ({ ...prev, mergeStrategy: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-popover border-border shadow-lg z-50">
+                            <SelectItem value="append">Anhängen (Append)</SelectItem>
+                            <SelectItem value="join">Verknüpfen (Join)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
 
-                {currentRecipe.mergeStrategy === 'join' && (
-                  <div>
-                    <Label>Join-Spalte</Label>
-                    <Input
-                      value={currentRecipe.joinColumn || ''}
-                      onChange={(e) => setCurrentRecipe(prev => ({ ...prev, joinColumn: e.target.value }))}
-                      placeholder="Spaltenname für Verknüpfung"
-                    />
-                  </div>
-                )}
+                    {currentRecipe.mergeStrategy === 'join' && (
+                      <div>
+                        <Label>Join-Spalte</Label>
+                        <Input
+                          value={currentRecipe.joinColumn || ''}
+                          onChange={(e) => setCurrentRecipe(prev => ({ ...prev, joinColumn: e.target.value }))}
+                          placeholder="Spaltenname für Verknüpfung"
+                        />
+                      </div>
+                    )}
 
-                <div>
-                  <Label>Beschreibung</Label>
-                  <Textarea
-                    value={currentRecipe.description || ''}
-                    onChange={(e) => setCurrentRecipe(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Beschreibung des Transformation-Rezepts..."
-                    rows={3}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+                    <div>
+                      <Label>Beschreibung</Label>
+                      <Textarea
+                        value={currentRecipe.description || ''}
+                        onChange={(e) => setCurrentRecipe(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Beschreibung des Transformation-Rezepts..."
+                        rows={3}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <div>
+                <LivePreview files={csvFiles} recipe={currentRecipe} maxRows={5} />
+              </div>
+            </div>
 
             {/* Column Mappings */}
             <Card>
@@ -565,10 +574,10 @@ const CSVTransformer = () => {
                             <Input
                               value={column.formula || ''}
                               onChange={(e) => updateNewColumn(index, 'formula', e.target.value)}
-                              placeholder="Formel (z.B. '[firstName]' + '@' + 'domain.com')"
+                              placeholder='=A1&"@appleid.ds-greiz.de" oder =[firstName]&"@"&[domain]'
                             />
                             <p className="text-xs text-muted-foreground mt-1">
-                              Verwenden Sie [SpaltenName] für Spalten-Referenzen
+                              Verwenden Sie Excel-Syntax: =A1&"text" oder Named-Referenzen: [SpaltenName]&"text"
                             </p>
                           </div>
                         )}
