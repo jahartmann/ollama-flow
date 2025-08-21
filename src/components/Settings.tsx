@@ -302,11 +302,41 @@ const Settings = () => {
                   <Alert variant="destructive">
                     <AlertCircle className="w-4 h-4" />
                     <AlertDescription>
-                      <div className="space-y-2">
-                        <p className="font-medium">{connectionError}</p>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="font-medium text-red-600 mb-1">🚫 CORS-Problem erkannt!</p>
+                          <p className="text-sm">Ollama läuft, aber der Browser blockiert die Verbindung aus Sicherheitsgründen.</p>
+                        </div>
+                        
+                        <div className="bg-red-50 border border-red-200 rounded p-3">
+                          <p className="font-medium text-red-800 mb-2">🔧 Schnelle Lösung:</p>
+                          <div className="space-y-2">
+                            <p className="text-sm text-red-700">1. Stoppen Sie Ollama (Strg+C im Terminal)</p>
+                            <p className="text-sm text-red-700">2. Starten Sie es neu mit CORS:</p>
+                            <div className="bg-red-100 p-2 rounded font-mono text-sm text-red-900 select-all">
+                              OLLAMA_ORIGINS=* ollama serve
+                            </div>
+                            <p className="text-xs text-red-600">
+                              💡 Kopieren Sie diesen Befehl und führen Sie ihn in Ihrem Terminal aus
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-sm">
+                          <span>🧪 Test:</span>
+                          <a 
+                            href={`${config.serverUrl}:${config.port}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-blue-600 hover:underline font-mono"
+                          >
+                            {config.serverUrl}:{config.port} ↗️
+                          </a>
+                        </div>
+
                         {detailedError && (
                           <details className="text-sm">
-                            <summary className="cursor-pointer hover:underline">Detaillierte Hilfe anzeigen</summary>
+                            <summary className="cursor-pointer hover:underline text-muted-foreground">Technische Details anzeigen</summary>
                             <pre className="mt-2 whitespace-pre-wrap text-xs bg-muted p-2 rounded">
                               {detailedError}
                             </pre>
