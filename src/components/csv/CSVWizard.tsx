@@ -1,13 +1,15 @@
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Settings, LayoutTemplate, Eye } from 'lucide-react';
-import { CSVFile, CSVTemplate, transformationEngine } from '@/lib/transformationEngine';
+import { Upload, GitCompare, LayoutTemplate, Eye, ArrowRight } from 'lucide-react';
+import { CSVFile, CSVTemplate, TemplateColumnMapping, transformationEngine } from '@/lib/transformationEngine';
 import { fileProcessor } from '@/lib/fileProcessor';
 import ProgressIndicator, { Step } from './ProgressIndicator';
 import UploadStep from './steps/UploadStep';
+import OperationSelectionStep from './steps/OperationSelectionStep';
 import ProcessStep from './steps/ProcessStep';
-import TemplateStep from './steps/TemplateStep';
+import ComparisonStep from './steps/ComparisonStep';
+import TemplateMappingStep from './steps/TemplateMappingStep';
 import PreviewStep from './steps/PreviewStep';
 
 interface CSVWizardProps {
@@ -19,38 +21,68 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [files, setFiles] = useState<CSVFile[]>([]);
+  const [selectedOperation, setSelectedOperation] = useState<'transform' | 'compare' | null>(null);
   const [processedData, setProcessedData] = useState<CSVFile | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<CSVTemplate | null>(null);
-  const [previewFile, setPreviewFile] = useState<CSVFile | null>(null);
+  const [columnMappings, setColumnMappings] = useState<TemplateColumnMapping[]>([]);
+  const [appliedFilters, setAppliedFilters] = useState<any[]>([]);
   const { toast } = useToast();
 
-  // Define wizard steps
-  const steps: Step[] = [
-    {
-      id: 'upload',
-      title: 'Dateien hochladen',
-      description: 'CSV-Dateien auswählen und hochladen',
-      icon: <Upload className="w-4 h-4" />
-    },
-    {
-      id: 'process',
-      title: 'Verarbeitung',
-      description: 'Daten verarbeiten und transformieren (optional)',
-      icon: <Settings className="w-4 h-4" />
-    },
-    {
-      id: 'template',
-      title: 'Template',
-      description: 'Output-Format mit Template definieren (optional)',
-      icon: <LayoutTemplate className="w-4 h-4" />
-    },
-    {
-      id: 'preview',
-      title: 'Vorschau & Export',
-      description: 'Ergebnis prüfen und exportieren',
-      icon: <Eye className="w-4 h-4" />
+  // Define wizard steps - dynamic based on operation
+  const getSteps = (): Step[] => {
+    const baseSteps = [
+      {
+        id: 'upload',
+        title: 'Dateien hochladen',
+        description: 'CSV-Dateien auswählen und hochladen',
+        icon: <Upload className="w-4 h-4" />
+      },
+      {
+        id: 'operation',
+        title: 'Operation wählen',
+        description: 'Zwischen Bearbeitung und Vergleich wählen',
+        icon: <ArrowRight className="w-4 h-4" />
+      }
+    ];
+
+    if (selectedOperation === 'transform') {
+      return [
+        ...baseSteps,
+        {
+          id: 'process',
+          title: 'Verarbeitung',
+          description: 'Daten verarbeiten und transformieren',
+          icon: <GitCompare className="w-4 h-4" />
+        },
+        {
+          id: 'mapping',
+          title: 'Template & Mapping',
+          description: 'Felder zuordnen und Live-Vorschau',
+          icon: <LayoutTemplate className="w-4 h-4" />
+        },
+        {
+          id: 'preview',
+          title: 'Vorschau & Export',
+          description: 'Ergebnis prüfen und exportieren',
+          icon: <Eye className="w-4 h-4" />
+        }
+      ];
+    } else if (selectedOperation === 'compare') {
+      return [
+        ...baseSteps,
+        {
+          id: 'compare',
+          title: 'Vergleichen',
+          description: 'Unterschiede zwischen Dateien analysieren',
+          icon: <GitCompare className="w-4 h-4" />
+        }
+      ];
     }
-  ];
+
+    return baseSteps;
+  };
+
+  const steps = getSteps();
 
   // File upload handler
   const handleFileUpload = useCallback(async (uploadedFiles: File[]) => {
@@ -94,7 +126,6 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
 
   // File preview handler
   const handlePreviewFile = useCallback((file: CSVFile) => {
-    setPreviewFile(file);
     // Could open a modal or navigate to preview
     toast({
       title: "Vorschau",
@@ -179,12 +210,33 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
     }
   }, [files, toast]);
 
+  // Operation selection handler
+  const handleOperationSelect = useCallback((operation: 'transform' | 'compare') => {
+    setSelectedOperation(operation);
+    // Reset step to continue with selected operation
+    setCurrentStep(2);
+    toast({
+      title: "Operation ausgewählt",
+      description: `${operation === 'transform' ? 'Transformation' : 'Vergleich'} wurde ausgewählt`
+    });
+  }, [toast]);
+
   // Template selection handler
   const handleTemplateSelect = useCallback((template: CSVTemplate) => {
     setSelectedTemplate(template);
     toast({
       title: "Template ausgewählt",
       description: `Template "${template.name}" wurde ausgewählt`
+    });
+  }, [toast]);
+
+  // Mapping completion handler
+  const handleMappingComplete = useCallback((mappings: TemplateColumnMapping[], filters: any[]) => {
+    setColumnMappings(mappings);
+    setAppliedFilters(filters);
+    toast({
+      title: "Mapping abgeschlossen",
+      description: "Feldmappings und Filter wurden konfiguriert"
     });
   }, [toast]);
 
@@ -247,16 +299,19 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
     
     toast({
       title: "Verarbeitung abgeschlossen",
-      description: "CSV-Transformation erfolgreich beendet"
+      description: selectedOperation === 'compare' ? "Vergleich erfolgreich beendet" : "CSV-Transformation erfolgreich beendet"
     });
     
     // Reset wizard
     setCurrentStep(0);
     setCompletedSteps([]);
     setFiles([]);
+    setSelectedOperation(null);
     setProcessedData(null);
     setSelectedTemplate(null);
-  }, [processedData, files, onComplete, toast]);
+    setColumnMappings([]);
+    setAppliedFilters([]);
+  }, [processedData, files, onComplete, selectedOperation, toast]);
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -297,31 +352,54 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
           )}
 
           {currentStep === 1 && (
-            <ProcessStep
+            <OperationSelectionStep
               files={files}
-              onProcess={handleProcess}
-              onNext={goToNextStep}
+              onOperationSelect={handleOperationSelect}
               onBack={goToPreviousStep}
             />
           )}
 
-          {currentStep === 2 && (
-            <TemplateStep
-              files={files}
-              selectedTemplate={selectedTemplate}
-              onTemplateSelect={handleTemplateSelect}
-              onNext={goToNextStep}
-              onBack={goToPreviousStep}
-              onSkip={goToNextStep}
-            />
+          {/* Transform workflow */}
+          {selectedOperation === 'transform' && (
+            <>
+              {currentStep === 2 && (
+                <ProcessStep
+                  files={files}
+                  onProcess={handleProcess}
+                  onNext={goToNextStep}
+                  onBack={goToPreviousStep}
+                />
+              )}
+
+              {currentStep === 3 && (
+                <TemplateMappingStep
+                  files={files}
+                  processedData={processedData}
+                  selectedTemplate={selectedTemplate}
+                  onTemplateSelect={handleTemplateSelect}
+                  onMappingComplete={handleMappingComplete}
+                  onNext={goToNextStep}
+                  onBack={goToPreviousStep}
+                />
+              )}
+
+              {currentStep === 4 && (
+                <PreviewStep
+                  originalFiles={files}
+                  processedData={processedData}
+                  selectedTemplate={selectedTemplate}
+                  onExport={handleExport}
+                  onBack={goToPreviousStep}
+                  onFinish={handleFinish}
+                />
+              )}
+            </>
           )}
 
-          {currentStep === 3 && (
-            <PreviewStep
-              originalFiles={files}
-              processedData={processedData}
-              selectedTemplate={selectedTemplate}
-              onExport={handleExport}
+          {/* Compare workflow */}
+          {selectedOperation === 'compare' && currentStep === 2 && (
+            <ComparisonStep
+              files={files}
               onBack={goToPreviousStep}
               onFinish={handleFinish}
             />

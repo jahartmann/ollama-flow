@@ -26,15 +26,18 @@ export interface CSVTemplate {
   headers: string[];
   description?: string;
   created: Date;
+  columns?: Array<{
+    name: string;
+    type: 'string' | 'number' | 'email' | 'date';
+    required: boolean;
+  }>;
 }
 
 export interface TemplateColumnMapping {
-  targetColumn: string; // Column name in the template
-  sourceType: 'column' | 'formula' | 'fixed' | 'conditional';
-  sourceColumn?: string; // For direct column mapping
-  formula?: string; // For formula-based mapping
-  fixedValue?: string; // For fixed values
-  conditions?: ConditionalRule[]; // For conditional logic
+  templateColumn: string;
+  sourceColumn: string;
+  transformation?: 'direct' | 'uppercase' | 'lowercase' | 'trim' | 'format_phone';
+  defaultValue?: string;
 }
 
 export interface ConditionalRule {
@@ -345,29 +348,31 @@ export class TransformationEngine {
       const newRow: string[] = [];
       
       template.headers.forEach(templateColumn => {
-        const mapping = mappings.find(m => m.targetColumn === templateColumn);
+        const mapping = mappings.find(m => m.templateColumn === templateColumn);
         let value = '';
         
         if (mapping) {
-          switch (mapping.sourceType) {
-            case 'column':
-              if (mapping.sourceColumn) {
-                const sourceIndex = file.headers.indexOf(mapping.sourceColumn);
-                value = sourceIndex !== -1 ? (row[sourceIndex] || '') : '';
-              }
-              break;
-              
-            case 'formula':
-              value = this.evaluateFormula(mapping.formula || '', row, file.headers);
-              break;
-              
-            case 'fixed':
-              value = mapping.fixedValue || '';
-              break;
-              
-            case 'conditional':
-              value = this.evaluateConditional(mapping.conditions || [], row, file.headers);
-              break;
+          if (mapping.sourceColumn) {
+            const sourceIndex = file.headers.indexOf(mapping.sourceColumn);
+            value = sourceIndex !== -1 ? (row[sourceIndex] || '') : '';
+            
+            // Apply transformation
+            switch (mapping.transformation) {
+              case 'uppercase':
+                value = value.toUpperCase();
+                break;
+              case 'lowercase':
+                value = value.toLowerCase();
+                break;
+              case 'trim':
+                value = value.trim();
+                break;
+              case 'format_phone':
+                value = value.replace(/\D/g, '').replace(/(\d{4})(\d{3})(\d{4})/, '+49 $1 $2 $3');
+                break;
+            }
+          } else {
+            value = mapping.defaultValue || '';
           }
         }
         
