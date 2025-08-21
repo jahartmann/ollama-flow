@@ -7,7 +7,8 @@ import {
   Settings,
   Zap,
   Database,
-  Brain
+  Brain,
+  Palette
 } from 'lucide-react';
 
 const Navigation = () => {
@@ -33,10 +34,16 @@ const Navigation = () => {
       description: 'Gespeicherte Workflows verwalten'
     },
     {
+      path: '/editor',
+      label: 'Visueller Editor',
+      icon: Palette,
+      description: 'Drag-and-Drop Workflow-Editor'
+    },
+    {
       path: '/settings',
-      label: 'Ollama Setup',
+      label: 'Einstellungen',
       icon: Settings,
-      description: 'KI-Konfiguration'
+      description: 'KI-Konfiguration & Updates'
     }
   ];
 

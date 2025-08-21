@@ -7,10 +7,37 @@ import Navigation from "@/components/Navigation";
 import ETLWizard from "@/components/ETLWizard";
 import DataPreview from "@/components/DataPreview";
 import WorkflowHub from "@/components/WorkflowHub";
+import VisualWorkflowEditor from "@/components/VisualWorkflowEditor";
 import OllamaSettings from "@/components/OllamaSettings";
+import UpdateNotification from "@/components/UpdateNotification";
+import { useUpdateChecker } from "@/hooks/useUpdateChecker";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+const AppContent = () => {
+  const { updateInfo, dismissUpdate } = useUpdateChecker();
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navigation />
+      {updateInfo?.available && (
+        <UpdateNotification
+          updateInfo={updateInfo}
+          onDismiss={dismissUpdate}
+        />
+      )}
+      <Routes>
+        <Route path="/" element={<ETLWizard />} />
+        <Route path="/preview" element={<DataPreview />} />
+        <Route path="/workflows" element={<WorkflowHub />} />
+        <Route path="/editor" element={<VisualWorkflowEditor />} />
+        <Route path="/settings" element={<OllamaSettings />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </div>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -18,16 +45,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <div className="min-h-screen bg-background">
-          <Navigation />
-          <Routes>
-            <Route path="/" element={<ETLWizard />} />
-            <Route path="/preview" element={<DataPreview />} />
-            <Route path="/workflows" element={<WorkflowHub />} />
-            <Route path="/settings" element={<OllamaSettings />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </div>
+        <AppContent />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

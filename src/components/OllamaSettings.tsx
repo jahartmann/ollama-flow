@@ -246,53 +246,74 @@ const OllamaSettings = () => {
                 Lade verfügbare Modelle...
               </div>
             ) : availableModels.length > 0 ? (
-              <>
-                <div>
-                  <Label>Aktives Modell</Label>
-                  <Select
-                    value={config.selectedModel}
-                    onValueChange={(value) => handleConfigChange('selectedModel', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Modell auswählen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableModels.map((model) => (
-                        <SelectItem key={model.name} value={model.name}>
-                          <div className="flex items-center justify-between w-full">
-                            <span>{model.name}</span>
-                            <Badge variant="outline" className="ml-2">
-                              {model.size}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  {availableModels.map((model) => (
-                    <Card 
-                      key={model.name}
-                      className={`cursor-pointer transition-smooth ${
-                        model.name === config.selectedModel 
-                          ? 'ring-2 ring-primary' 
-                          : 'hover:bg-muted/50'
-                      }`}
-                      onClick={() => handleConfigChange('selectedModel', model.name)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="font-medium">{model.name}</div>
-                        <div className="text-muted-foreground">{model.size}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Geändert: {model.modified}
+            <div className="space-y-4">
+              <div>
+                <Label>Aktives Modell</Label>
+                <Select
+                  value={config.selectedModel}
+                  onValueChange={(value) => handleConfigChange('selectedModel', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Modell auswählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableModels.map((model) => (
+                      <SelectItem key={model.name} value={model.name}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{model.name}</span>
+                          <Badge variant="outline" className="ml-2">
+                            {model.size}
+                          </Badge>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                {availableModels.map((model) => (
+                  <Card 
+                    key={model.name}
+                    className={`cursor-pointer transition-smooth ${
+                      model.name === config.selectedModel 
+                        ? 'ring-2 ring-primary' 
+                        : 'hover:bg-muted/50'
+                    }`}
+                    onClick={() => handleConfigChange('selectedModel', model.name)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="font-medium">{model.name}</div>
+                      <div className="text-muted-foreground">{model.size}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Geändert: {model.modified}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <Separator />
+
+              {/* Update Settings Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Automatische Updates</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Automatische Prüfung auf neue Versionen
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.dispatchEvent(new CustomEvent('checkUpdate'))}
+                  >
+                    Jetzt prüfen
+                  </Button>
                 </div>
-              </>
+              </div>
+            </div>
             ) : (
               <Alert>
                 <AlertCircle className="w-4 h-4" />
