@@ -51,10 +51,25 @@ const TemplateUpload: React.FC<TemplateUploadProps> = ({ onTemplateCreate, onClo
     const file = event.target.files?.[0];
     if (!file) return;
 
+    console.log('=== TEMPLATE FILE UPLOAD ===');
+    console.log('File:', file.name);
+
     try {
       const text = await file.text();
-      const lines = text.split('\n');
-      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      console.log('File content (first 200 chars):', text.substring(0, 200));
+      
+      // Detect delimiter in file content
+      const hasSemicolon = text.includes(';');
+      const hasComma = text.includes(',');
+      const delimiter = hasSemicolon ? ';' : hasComma ? ',' : ';';
+      
+      console.log('Detected delimiter for template:', delimiter);
+      
+      const lines = text.split('\n').filter(line => line.trim());
+      const headers = lines[0].split(delimiter).map(h => h.trim().replace(/"/g, ''));
+      
+      console.log('Extracted headers:', headers);
+      console.log('Headers count:', headers.length);
       
       const newColumns: CustomColumn[] = headers.map((header, index) => ({
         id: (index + 1).toString(),
@@ -63,9 +78,13 @@ const TemplateUpload: React.FC<TemplateUploadProps> = ({ onTemplateCreate, onClo
         required: false
       }));
       
+      console.log('Created columns:', newColumns);
+      
       setColumns(newColumns);
       setTemplateName(file.name.replace('.csv', ''));
       setTemplateDescription(`Importiert aus ${file.name}`);
+      
+      console.log('=== END TEMPLATE FILE UPLOAD ===');
     } catch (error) {
       console.error('Template upload error:', error);
     }

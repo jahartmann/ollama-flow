@@ -20,65 +20,141 @@ export interface ParseOptions {
 class FileProcessor {
   // Convert File to CSVFile format with delimiter detection
   async processFile(file: File, delimiter?: string): Promise<CSVFile> {
+    console.log('=== PROCESSING FILE ===');
+    console.log('File name:', file.name);
+    console.log('Provided delimiter:', delimiter);
+    
     // Auto-detect delimiter if not provided
     const detectedDelimiter = delimiter || await this.detectDelimiter(file);
+    console.log('Using delimiter:', detectedDelimiter);
+    
+    // Force semicolon for template files or files with semicolon in name
+    const finalDelimiter = file.name.includes('template') || detectedDelimiter === ';' ? ';' : detectedDelimiter;
+    console.log('Final delimiter to use:', finalDelimiter);
     
     const parseResult = await this.parseCSV(file, { 
-      delimiter: detectedDelimiter,
+      delimiter: finalDelimiter,
       hasHeaders: true,
       skipEmptyLines: true 
     });
     
-    return {
+    console.log('Parse result headers count:', parseResult.headers.length);
+    console.log('Parse result headers:', parseResult.headers);
+    
+    const csvFile = {
       id: `csv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: parseResult.filename,
       headers: parseResult.headers,
       data: parseResult.data,
-      delimiter: detectedDelimiter // Store delimiter for later use
+      delimiter: finalDelimiter
     };
+    
+    console.log('Created CSV file object:', csvFile);
+    console.log('=== END PROCESSING FILE ===');
+    
+    return csvFile;
   }
 
   async parseCSV(file: File, options: ParseOptions = {}): Promise<CSVParseResult> {
     return new Promise((resolve, reject) => {
-      Papa.parse(file, {
-        complete: (results) => {
-          console.log('CSV parsing completed:', results);
-          
-          const data = results.data as string[][];
-          const errors = results.errors.map(err => err.message);
-          
-          // Filter out empty rows
-          const filteredData = options.skipEmptyLines !== false 
-            ? data.filter(row => row.some(cell => cell && cell.trim() !== ''))
-            : data;
+      console.log('=== CSV PARSING DEBUG ===');
+      console.log('File:', file.name);
+      console.log('Options:', options);
+      
+        Papa.parse(file, {
+          complete: (results) => {
+            console.log('Papa.parse results:', results);
+            console.log('Raw data sample:', results.data.slice(0, 2));
+            console.log('Used delimiter in Papa.parse:', options.delimiter);
             
-          // Extract headers if specified
-          let headers: string[] = [];
-          let rows: string[][] = filteredData;
-          
-          if (options.hasHeaders !== false && filteredData.length > 0) {
-            headers = filteredData[0];
-            rows = filteredData.slice(1);
-          } else {
-            // Generate column names like Excel: A, B, C, etc.
-            const columnCount = filteredData[0]?.length || 0;
-            headers = Array.from({ length: columnCount }, (_, i) => 
-              String.fromCharCode(65 + i) // A, B, C, D...
-            );
-          }
+            const data = results.data as string[][];
+            const errors = results.errors.map(err => err.message);
+            
+            console.log('Parsed data length:', data.length);
+            console.log('First row:', data[0]);
+            console.log('First row length:', data[0]?.length);
+            
+            // If we still have only 1 column and delimiter is semicolon, force split
+            if (data[0]?.length === 1 && options.delimiter === ';' && data[0][0]?.includes(';')) {
+              console.log('Forcing semicolon split because Papa.parse failed');
+              const forcedData = data.map(row => row[0]?.split(';') || []);
+              console.log('Forced split first row:', forcedData[0]);
+              
+              // Use the forced split data
+              const filteredData = forcedData.filter(row => row.some(cell => cell && cell.trim() !== ''));
+              
+              let headers: string[] = [];
+              let rows: string[][] = filteredData;
+              
+              if (options.hasHeaders !== false && filteredData.length > 0) {
+                headers = filteredData[0].map(h => h.trim());
+                rows = filteredData.slice(1);
+              } else {
+                const columnCount = filteredData[0]?.length || 0;
+                headers = Array.from({ length: columnCount }, (_, i) => 
+                  String.fromCharCode(65 + i)
+                );
+              }
+              
+              console.log('Forced headers:', headers);
+              console.log('Forced headers count:', headers.length);
+              
+              const result: CSVParseResult = {
+                data: rows,
+                headers,
+                errors,
+                filename: file.name,
+                rowCount: rows.length,
+                columnCount: headers.length
+              };
+              
+              console.log('Forced CSV result:', result);
+              resolve(result);
+              return;
+            }
+            
+            // Normal processing continues...
+            
+            // Filter out empty rows
+            const filteredData = options.skipEmptyLines !== false 
+              ? data.filter(row => row.some(cell => cell && cell.trim() !== ''))
+              : data;
+              
+            console.log('Filtered data length:', filteredData.length);
+            console.log('First filtered row:', filteredData[0]);
+              
+            // Extract headers if specified
+            let headers: string[] = [];
+            let rows: string[][] = filteredData;
+            
+            if (options.hasHeaders !== false && filteredData.length > 0) {
+              headers = filteredData[0].map(h => (h || '').trim());
+              rows = filteredData.slice(1);
+            } else {
+              // Generate column names like Excel: A, B, C, etc.
+              const columnCount = filteredData[0]?.length || 0;
+              headers = Array.from({ length: columnCount }, (_, i) => 
+                String.fromCharCode(65 + i) // A, B, C, D...
+              );
+            }
 
-          const result: CSVParseResult = {
-            data: rows,
-            headers,
-            errors,
-            filename: file.name,
-            rowCount: rows.length,
-            columnCount: headers.length
-          };
+            console.log('Final headers:', headers);
+            console.log('Headers count:', headers.length);
+            console.log('Sample row data:', rows[0]);
 
-          console.log('Parsed CSV result:', result);
-          resolve(result);
-        },
+            const result: CSVParseResult = {
+              data: rows,
+              headers,
+              errors,
+              filename: file.name,
+              rowCount: rows.length,
+              columnCount: headers.length
+            };
+
+            console.log('Final CSV result:', result);
+            console.log('=== END CSV PARSING DEBUG ===');
+            resolve(result);
+          },
         error: (error) => {
           console.error('CSV parsing error:', error);
           reject(new Error(`CSV parsing failed: ${error.message}`));
