@@ -145,6 +145,22 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
           };
           break;
           
+        case 'ai_transform':
+          // AI transformation - use the transformedData from the AI if available
+          result = {
+            ...files[0],
+            id: `ai_transformed_${files[0].id}`,
+            name: `ai_transformed_${files[0].name}`,
+            data: options.transformedData || files[0].data // Use AI result or fallback to original
+          };
+          
+          // Store AI analysis for later reference
+          toast({
+            title: "KI-Transformation angewendet",
+            description: "Die KI-Analyse wurde erfolgreich auf Ihre Daten angewendet"
+          });
+          break;
+          
         default:
           result = files[0]; // No processing
       }

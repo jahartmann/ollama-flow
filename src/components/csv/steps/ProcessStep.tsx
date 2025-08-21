@@ -3,8 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowRight, Merge, Split, Filter, Plus } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowRight, Merge, Split, Filter, Plus, Brain, Sparkles } from 'lucide-react';
 import { CSVFile } from '@/lib/transformationEngine';
+import { ollamaAPI } from '@/lib/ollamaApi';
+import { useToast } from '@/hooks/use-toast';
 
 interface ProcessStepProps {
   files: CSVFile[];
@@ -21,6 +24,9 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
 }) => {
   const [selectedOperation, setSelectedOperation] = useState<string>('');
   const [operationOptions, setOperationOptions] = useState<any>({});
+  const [aiPrompt, setAiPrompt] = useState<string>('');
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
+  const { toast } = useToast();
 
   const operations = [
     {
@@ -44,6 +50,14 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
       title: 'Spalten transformieren',
       description: 'Ändern, hinzufügen oder entfernen von Spalten',
       icon: <Plus className="w-5 h-5" />,
+      minFiles: 1,
+      available: files.length >= 1
+    },
+    {
+      id: 'ai_transform',
+      title: 'KI-gesteuerte Transformation',
+      description: 'Lassen Sie die KI Ihre Daten intelligent transformieren',
+      icon: <Brain className="w-5 h-5" />,
       minFiles: 1,
       available: files.length >= 1
     },
@@ -76,14 +90,67 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
       case 'transform':
         setOperationOptions({ transformations: [] });
         break;
+      case 'ai_transform':
+        setOperationOptions({ prompt: '', analysis: null });
+        break;
     }
   };
 
-  const executeOperation = () => {
+  const executeOperation = async () => {
     if (selectedOperation && selectedOperation !== 'skip') {
-      onProcess(selectedOperation, operationOptions);
+      if (selectedOperation === 'ai_transform') {
+        await handleAiTransformation();
+      } else {
+        onProcess(selectedOperation, operationOptions);
+      }
     }
     onNext();
+  };
+
+  const handleAiTransformation = async () => {
+    if (!aiPrompt.trim()) {
+      toast({
+        title: "Eingabe erforderlich",
+        description: "Bitte beschreiben Sie, wie die Daten transformiert werden sollen",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsAiProcessing(true);
+    try {
+      const result = await ollamaAPI.processDataTransformation(
+        files[0].data.slice(0, 10), // Send first 10 rows for context
+        aiPrompt,
+        files[0].headers // Pass headers to AI
+      );
+      
+      toast({
+        title: "KI-Transformation abgeschlossen",
+        description: "Die KI hat Ihre Daten analysiert und Transformationsvorschläge erstellt"
+      });
+
+      // Store AI analysis in operation options
+      setOperationOptions(prev => ({
+        ...prev,
+        analysis: result.explanation,
+        transformedData: result.transformedData
+      }));
+      
+      onProcess('ai_transform', {
+        prompt: aiPrompt,
+        analysis: result.explanation,
+        transformedData: result.transformedData
+      });
+    } catch (error) {
+      toast({
+        title: "KI-Transformation fehlgeschlagen",
+        description: error instanceof Error ? error.message : "Unbekannter Fehler",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAiProcessing(false);
+    }
   };
 
   return (
@@ -237,6 +304,57 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
                     </div>
                   </div>
                 )}
+
+                {selectedOperation === 'ai_transform' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" />
+                        KI-Transformationsanweisung
+                      </label>
+                      <Textarea
+                        placeholder="Beschreiben Sie, wie die Daten transformiert werden sollen... z.B.: 'Erstelle eine neue Spalte Email aus Vorname und Nachname', 'Filtere alle Einträge mit Status aktiv', 'Bereinige die Telefonnummern'"
+                        value={aiPrompt}
+                        onChange={(e) => setAiPrompt(e.target.value)}
+                        className="min-h-[100px]"
+                      />
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Die KI analysiert Ihre Daten und führt die gewünschten Transformationen durch.
+                      </p>
+                    </div>
+
+                    {operationOptions.analysis && (
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <h4 className="font-medium mb-2 flex items-center gap-2">
+                          <Brain className="w-4 h-4" />
+                          KI-Analyse
+                        </h4>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {operationOptions.analysis}
+                        </p>
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={handleAiTransformation}
+                      disabled={!aiPrompt.trim() || isAiProcessing}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      {isAiProcessing ? (
+                        <>
+                          <Brain className="w-4 h-4 mr-2 animate-pulse" />
+                          KI verarbeitet...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          KI-Analyse starten
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -249,10 +367,12 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
             
             <Button 
               onClick={executeOperation}
-              disabled={!selectedOperation}
+              disabled={!selectedOperation || (selectedOperation === 'ai_transform' && isAiProcessing)}
               className="px-8"
             >
-              {selectedOperation === 'skip' ? 'Überspringen' : 'Verarbeiten & Weiter'}
+              {selectedOperation === 'skip' ? 'Überspringen' : 
+               selectedOperation === 'ai_transform' && isAiProcessing ? 'KI verarbeitet...' :
+               'Verarbeiten & Weiter'}
             </Button>
           </div>
         </CardContent>

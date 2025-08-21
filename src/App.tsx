@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import CSVWizard from "@/components/csv/CSVWizard";
 import Settings from "@/components/Settings";
+import AIChat from "@/pages/AIChat";
 import UpdateNotification from "@/components/UpdateNotification";
 import { useUpdateChecker } from "@/hooks/useUpdateChecker";
 import NotFound from "./pages/NotFound";
@@ -45,6 +46,7 @@ const AppContent = () => {
             />
           } 
         />
+        <Route path="/ai-chat" element={<AIChat />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

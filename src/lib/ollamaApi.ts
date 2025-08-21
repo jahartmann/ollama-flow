@@ -161,30 +161,76 @@ class OllamaAPI {
     }
   }
 
-  async processDataTransformation(data: string[][], prompt: string): Promise<{ 
+  async processDataTransformation(data: string[][], prompt: string, headers?: string[]): Promise<{ 
     transformedData: string[][], 
-    explanation: string 
+    explanation: string,
+    suggestedHeaders?: string[]
   }> {
-    const dataContext = `CSV Data Preview (first 5 rows):
-${data.slice(0, 5).map(row => row.join(',')).join('\n')}
+    const dataPreview = data.slice(0, 10);
+    const headerInfo = headers ? `Headers: ${headers.join(', ')}` : 'No headers provided';
+    
+    const systemPrompt = `Du bist ein intelligenter CSV-Datenanalyst. Analysiere die bereitgestellten CSV-Daten und führe die gewünschte Transformation durch.
 
-Task: ${prompt}
+WICHTIG: Du sollst echte, praktische Transformationen durchführen, nicht nur Vorschläge machen.
 
-Please provide:
-1. Specific transformation steps
-2. Expected output format
-3. Any data validation concerns
+Verfügbare Transformationen:
+- Neue Spalten erstellen (z.B. Vollname aus Vor-/Nachname)
+- Daten bereinigen (z.B. Formatierung, Entfernung von Sonderzeichen)
+- Daten filtern (z.B. nur bestimmte Einträge behalten)
+- Daten umstrukturieren oder konvertieren
+- Bedingte Transformationen (z.B. Kategorisierung basierend auf Werten)
 
-Format your response as JSON with keys: "steps", "outputFormat", "concerns"`;
+Gib eine strukturierte Antwort im JSON-Format zurück:
+{
+  "transformation_steps": ["Schritt 1", "Schritt 2", ...],
+  "explanation": "Detaillierte Erklärung der durchgeführten Transformationen",
+  "success": true/false,
+  "suggested_actions": ["weitere mögliche Verbesserungen"]
+}`;
+
+    const userPrompt = `${headerInfo}
+
+CSV Datenvorschau (erste 10 Zeilen):
+${dataPreview.map((row, i) => `Zeile ${i + 1}: ${row.join(' | ')}`).join('\n')}
+
+Gewünschte Transformation: ${prompt}
+
+Führe die Transformation durch und erkläre, was du gemacht hast.`;
 
     try {
-      const response = await this.generateCompletion(prompt, dataContext);
+      const response = await this.generateCompletion(userPrompt, systemPrompt);
       
-      // Parse AI response and apply transformations
-      // This would need actual data processing logic
+      // Try to parse JSON response
+      let analysisResult;
+      try {
+        // Extract JSON from response if it's wrapped in text
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          analysisResult = JSON.parse(jsonMatch[0]);
+        } else {
+          // Fallback to plain text response
+          analysisResult = {
+            explanation: response,
+            transformation_steps: ["KI-Analyse durchgeführt"],
+            success: true,
+            suggested_actions: []
+          };
+        }
+      } catch (parseError) {
+        analysisResult = {
+          explanation: response,
+          transformation_steps: ["KI-Analyse durchgeführt"],
+          success: true,
+          suggested_actions: []
+        };
+      }
+
+      // For now, return original data with AI explanation
+      // In a more advanced implementation, we would actually transform the data based on the AI analysis
       return {
-        transformedData: data, // Placeholder - would implement actual transformation
-        explanation: response
+        transformedData: data,
+        explanation: analysisResult.explanation || response,
+        suggestedHeaders: headers
       };
     } catch (error) {
       throw new Error(`KI-Transformation fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);

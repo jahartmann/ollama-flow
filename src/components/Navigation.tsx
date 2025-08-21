@@ -8,7 +8,8 @@ import {
   Zap,
   Database,
   Brain,
-  Palette
+  Palette,
+  MessageSquare
 } from 'lucide-react';
 
 const Navigation = () => {
@@ -20,6 +21,12 @@ const Navigation = () => {
       label: 'CSV Transformer',
       icon: Zap,
       description: 'Daten-Transformation mit Rezepten'
+    },
+    {
+      path: '/ai-chat',
+      label: 'KI-Chat',
+      icon: MessageSquare,
+      description: 'Intelligenter Assistent für Ihre Daten'
     },
     {
       path: '/settings',
