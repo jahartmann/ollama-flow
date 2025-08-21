@@ -50,21 +50,15 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
   const sourceData = processedData || (files.length > 0 ? files[0] : null);
   const defaultTemplates = [
     {
-      id: 'custom',
-      name: 'Benutzerdefiniertes Format',
-      description: 'Erstellen Sie Ihr eigenes Ausgabeformat',
-      columns: []
-    },
-    {
       id: 'contact',
       name: 'Kontaktliste',
       description: 'Standard Kontaktformat mit Name, Email, Telefon',
       columns: [
-        { name: 'Vorname', type: 'string', required: true },
-        { name: 'Nachname', type: 'string', required: true },
-        { name: 'Email', type: 'email', required: true },
-        { name: 'Telefon', type: 'string', required: false },
-        { name: 'Firma', type: 'string', required: false }
+        { name: 'Vorname', type: 'string' as const, required: true },
+        { name: 'Nachname', type: 'string' as const, required: true },
+        { name: 'Email', type: 'email' as const, required: true },
+        { name: 'Telefon', type: 'string' as const, required: false },
+        { name: 'Firma', type: 'string' as const, required: false }
       ]
     },
     {
@@ -72,12 +66,12 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
       name: 'Produktkatalog',
       description: 'E-Commerce Produktformat',
       columns: [
-        { name: 'SKU', type: 'string', required: true },
-        { name: 'Produktname', type: 'string', required: true },
-        { name: 'Beschreibung', type: 'string', required: false },
-        { name: 'Preis', type: 'number', required: true },
-        { name: 'Kategorie', type: 'string', required: true },
-        { name: 'Lagerbestand', type: 'number', required: false }
+        { name: 'SKU', type: 'string' as const, required: true },
+        { name: 'Produktname', type: 'string' as const, required: true },
+        { name: 'Beschreibung', type: 'string' as const, required: false },
+        { name: 'Preis', type: 'number' as const, required: true },
+        { name: 'Kategorie', type: 'string' as const, required: true },
+        { name: 'Lagerbestand', type: 'number' as const, required: false }
       ]
     }
   ];
@@ -86,13 +80,18 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
 
   // Initialize mappings when template is selected
   React.useEffect(() => {
+    console.log('Template changed:', selectedTemplate); // Debug log
+    
     if (selectedTemplate && selectedTemplate.columns) {
       const initialMappings: TemplateColumnMapping[] = selectedTemplate.columns.map(col => ({
         templateColumn: col.name,
         sourceColumn: '',
         transformation: 'direct',
-        defaultValue: ''
+        defaultValue: '',
+        formula: ''
       }));
+      
+      console.log('Setting mappings:', initialMappings); // Debug log
       setMappings(initialMappings);
     }
   }, [selectedTemplate]);
@@ -206,14 +205,28 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
   }, [sourceData, mappings, filters]);
 
   const handleTemplateSelect = (templateId: string) => {
+    console.log('Template selected:', templateId); // Debug log
+    
     if (templateId === 'upload') {
       setShowTemplateUpload(true);
       return;
     }
     
     const template = availableTemplates.find(t => t.id === templateId);
+    console.log('Found template:', template); // Debug log
+    
     if (template) {
       onTemplateSelect(template as any);
+      toast({
+        title: "Template ausgewählt",
+        description: `Template "${template.name}" wurde ausgewählt`
+      });
+    } else {
+      toast({
+        title: "Template nicht gefunden",
+        description: `Template mit ID "${templateId}" wurde nicht gefunden`,
+        variant: "destructive"
+      });
     }
   };
 
@@ -338,7 +351,7 @@ Bitte erstelle automatische Mappings und Transformationen.`,
               <SelectTrigger>
                 <SelectValue placeholder="Template wählen..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-popover border z-50">
                 <SelectItem value="upload">
                   <div className="flex items-center gap-2">
                     <Upload className="w-4 h-4" />
