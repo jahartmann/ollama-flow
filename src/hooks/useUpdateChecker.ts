@@ -28,7 +28,7 @@ export const useUpdateChecker = () => {
   const [autoCheckEnabled, setAutoCheckEnabled] = useState(true);
 
   const CURRENT_VERSION = '1.0.0'; // This would normally come from package.json or env
-  const GITHUB_REPO = 'your-org/etl-platform'; // Configure this for your repo
+  const GITHUB_REPO = 'jahartmann/ollama-flow'; // Configure this for your repo
 
   const checkForUpdates = async (silent = false) => {
     if (!silent) setIsChecking(true);

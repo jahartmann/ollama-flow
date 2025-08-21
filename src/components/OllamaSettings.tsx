@@ -27,7 +27,7 @@ import { useUpdateChecker } from '@/hooks/useUpdateChecker';
 
 const OllamaSettings = () => {
   const [config, setConfig] = useState<OllamaConfig>(ollamaAPI.getConfig());
-  const { updateInfo, isChecking, checkForUpdates, autoCheckEnabled, toggleAutoCheck } = useUpdateChecker();
+  const { updateInfo, isChecking, error: updateError, checkForUpdates, autoCheckEnabled, toggleAutoCheck } = useUpdateChecker();
 
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [availableModels, setAvailableModels] = useState<OllamaModel[]>([]);
@@ -41,19 +41,37 @@ const OllamaSettings = () => {
     setErrorMessage('');
     
     try {
+      // Save config first
       ollamaAPI.saveConfig(config);
+      
+      console.log('Testing connection with config:', config);
       const isConnected = await ollamaAPI.testConnection();
       
       if (isConnected) {
         setConnectionStatus('connected');
+        console.log('Connection successful, loading models...');
         await loadModels();
       } else {
         setConnectionStatus('error');
-        setErrorMessage('Verbindung fehlgeschlagen. Stellen Sie sicher, dass Ollama läuft und die URL korrekt ist.');
+        setErrorMessage(`Verbindung zu ${config.serverUrl}:${config.port} fehlgeschlagen. Prüfen Sie:
+        - Ollama läuft (ollama serve)
+        - URL und Port sind korrekt
+        - Keine Firewall blockiert den Zugriff`);
       }
     } catch (error) {
+      console.error('Connection test error:', error);
       setConnectionStatus('error');
-      setErrorMessage(`Verbindungsfehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          setErrorMessage('VerbindungTimeout. Ollama Server antwortet nicht.');
+        } else if (error.message.includes('Failed to fetch')) {
+          setErrorMessage('CORS-Fehler oder Server nicht erreichbar. Stellen Sie sicher, dass Ollama läuft und konfiguriert ist, CORS-Anfragen zu akzeptieren.');
+        } else {
+          setErrorMessage(`Verbindungsfehler: ${error.message}`);
+        }
+      } else {
+        setErrorMessage('Unbekannter Verbindungsfehler');
+      }
     }
   };
 
@@ -364,7 +382,10 @@ const OllamaSettings = () => {
                 </div>
               </div>
               <Button
-                onClick={() => checkForUpdates()}
+                onClick={() => {
+                  console.log('Update check button clicked');
+                  checkForUpdates();
+                }}
                 disabled={isChecking}
                 className="flex items-center gap-2"
               >
@@ -388,7 +409,24 @@ const OllamaSettings = () => {
                 <AlertTitle>Update verfügbar</AlertTitle>
                 <AlertDescription>
                   Version {updateInfo.latestVersion} ist verfügbar. Aktuelle Version: {updateInfo.currentVersion}
+                  <br />
+                  <a 
+                    href={updateInfo.releaseUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline mt-2 inline-block"
+                  >
+                    Release Notes anzeigen →
+                  </a>
                 </AlertDescription>
+              </Alert>
+            )}
+
+            {updateError && (
+              <Alert variant="destructive">
+                <AlertCircle className="w-4 h-4" />
+                <AlertTitle>Update-Fehler</AlertTitle>
+                <AlertDescription>{updateError}</AlertDescription>
               </Alert>
             )}
           </CardContent>

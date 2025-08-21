@@ -50,35 +50,82 @@ class OllamaAPI {
 
   async testConnection(): Promise<boolean> {
     try {
+      console.log('Testing Ollama connection to:', this.baseUrl);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(`${this.baseUrl}/api/version`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        signal: controller.signal,
+        mode: 'cors'
       });
-      return response.ok;
+      
+      clearTimeout(timeoutId);
+      console.log('Ollama connection response:', response.status, response.statusText);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Ollama version:', data);
+        return true;
+      }
+      return false;
     } catch (error) {
       console.error('Connection test failed:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+      }
       return false;
     }
   }
 
   async getModels(): Promise<OllamaModel[]> {
     try {
+      console.log('Fetching models from:', `${this.baseUrl}/api/tags`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
       const response = await fetch(`${this.baseUrl}/api/tags`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        signal: controller.signal,
+        mode: 'cors'
       });
       
-      if (!response.ok) throw new Error('Failed to fetch models');
+      clearTimeout(timeoutId);
+      console.log('Models response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Models fetch error:', errorText);
+        throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`);
+      }
       
       const data = await response.json();
-      return data.models?.map((model: any) => ({
-        name: model.name,
-        size: this.formatBytes(model.size),
-        modified: new Date(model.modified_at).toLocaleDateString('de-DE'),
-        digest: model.digest
-      })) || [];
+      console.log('Models data:', data);
+      
+      if (!data.models || !Array.isArray(data.models)) {
+        console.warn('Unexpected response format:', data);
+        return [];
+      }
+
+      return data.models.map((model: any) => ({
+        name: model.name || 'Unknown',
+        size: typeof model.size === 'number' ? this.formatBytes(model.size) : (model.size || 'Unknown'),
+        modified: model.modified_at ? new Date(model.modified_at).toLocaleDateString('de-DE') : 'Unknown',
+        digest: model.digest || ''
+      }));
     } catch (error) {
       console.error('Failed to fetch models:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+      }
       throw error;
     }
   }
