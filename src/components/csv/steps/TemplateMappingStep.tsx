@@ -211,7 +211,10 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
 
   const updateMapping = (index: number, field: keyof TemplateColumnMapping, value: string) => {
     setMappings(prev => prev.map((mapping, i) => 
-      i === index ? { ...mapping, [field]: value } : mapping
+      i === index ? { 
+        ...mapping, 
+        [field]: value === 'none' ? '' : value // Convert 'none' back to empty string
+      } : mapping
     ));
   };
 
@@ -420,14 +423,14 @@ Bitte erstelle automatische Mappings und Transformationen.`,
                     <div>
                       <label className="text-xs text-muted-foreground">Quell-Spalte</label>
                       <Select
-                        value={mapping.sourceColumn}
+                        value={mapping.sourceColumn || 'none'}
                         onValueChange={(value) => updateMapping(index, 'sourceColumn', value)}
                       >
                         <SelectTrigger className="h-8">
                           <SelectValue placeholder="Wählen..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">-- Keine --</SelectItem>
+                          <SelectItem value="none">-- Keine --</SelectItem>
                           {sourceData?.headers.map(header => (
                             <SelectItem key={header} value={header}>{header}</SelectItem>
                           ))}
