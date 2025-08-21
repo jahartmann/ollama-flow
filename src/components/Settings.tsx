@@ -33,6 +33,7 @@ const Settings = () => {
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [lastConnectionTest, setLastConnectionTest] = useState<Date | null>(null);
   const [connectionError, setConnectionError] = useState<string>('');
+  const [detailedError, setDetailedError] = useState<string>('');
   const { toast } = useToast();
 
   // Load initial data
@@ -46,10 +47,11 @@ const Settings = () => {
     }
   }, []);
 
-  // Test Ollama connection
+  // Enhanced connection test with better error handling
   const testConnection = useCallback(async () => {
     setConnectionStatus('testing');
     setConnectionError('');
+    setDetailedError('');
     
     try {
       // Save current config first
@@ -69,7 +71,12 @@ const Settings = () => {
         await loadModels();
       } else {
         setConnectionStatus('failed');
-        setConnectionError('Verbindung fehlgeschlagen. Prüfen Sie URL, Port und ob Ollama läuft.');
+        
+        // Get detailed connection help
+        const help = ollamaAPI.getConnectionHelp();
+        setConnectionError('Verbindung zu Ollama fehlgeschlagen');
+        setDetailedError(`Häufige Probleme:\n• ${help.commonIssues.join('\n• ')}\n\nLösungsvorschläge:\n• ${help.solutions.join('\n• ')}`);
+        
         toast({
           title: "Verbindung fehlgeschlagen",
           description: "Überprüfen Sie die Einstellungen und starten Sie Ollama",
@@ -80,6 +87,18 @@ const Settings = () => {
       setConnectionStatus('failed');
       const errorMsg = error instanceof Error ? error.message : 'Unbekannter Fehler';
       setConnectionError(errorMsg);
+      
+      // Check for specific error types
+      if (errorMsg.includes('CORS') || errorMsg.includes('fetch')) {
+        setDetailedError(`CORS-Fehler erkannt:
+        
+• Ihr Browser blockiert die Anfrage an Ollama
+• Starten Sie Ollama mit CORS-Unterstützung:
+  OLLAMA_ORIGINS=* ollama serve
+• Oder verwenden Sie eine Browser-Erweiterung für CORS
+• Bei Docker: Stellen Sie sicher, dass Port 11434 exponiert ist`);
+      }
+      
       toast({
         title: "Verbindungsfehler",
         description: errorMsg,
@@ -269,12 +288,12 @@ const Settings = () => {
                   </div>
                 </div>
 
-                {/* Connection Status */}
+                {/* Enhanced Connection Status */}
                 {lastConnectionTest && connectionStatus === 'connected' && (
                   <Alert>
                     <CheckCircle2 className="w-4 h-4" />
                     <AlertDescription>
-                      Verbunden seit {lastConnectionTest.toLocaleTimeString('de-DE')}
+                      Erfolgreich verbunden seit {lastConnectionTest.toLocaleTimeString('de-DE')}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -282,7 +301,19 @@ const Settings = () => {
                 {connectionError && connectionStatus === 'failed' && (
                   <Alert variant="destructive">
                     <AlertCircle className="w-4 h-4" />
-                    <AlertDescription>{connectionError}</AlertDescription>
+                    <AlertDescription>
+                      <div className="space-y-2">
+                        <p className="font-medium">{connectionError}</p>
+                        {detailedError && (
+                          <details className="text-sm">
+                            <summary className="cursor-pointer hover:underline">Detaillierte Hilfe anzeigen</summary>
+                            <pre className="mt-2 whitespace-pre-wrap text-xs bg-muted p-2 rounded">
+                              {detailedError}
+                            </pre>
+                          </details>
+                        )}
+                      </div>
+                    </AlertDescription>
                   </Alert>
                 )}
 
@@ -310,14 +341,27 @@ const Settings = () => {
                   </Button>
                 </div>
 
-                {/* Help Section */}
+                {/* Enhanced Help Section */}
                 <div className="text-sm text-muted-foreground space-y-2">
                   <p className="font-medium">💡 Ollama Setup:</p>
                   <ol className="list-decimal list-inside space-y-1 ml-2">
                     <li>Installieren Sie Ollama von <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">ollama.ai</a></li>
-                    <li>Starten Sie Ollama mit <code className="bg-muted px-1 rounded">ollama serve</code></li>
+                    <li>Starten Sie Ollama: <code className="bg-muted px-1 rounded">ollama serve</code></li>
+                    <li>Für CORS: <code className="bg-muted px-1 rounded">OLLAMA_ORIGINS=* ollama serve</code></li>
                     <li>Laden Sie ein Modell: <code className="bg-muted px-1 rounded">ollama pull llama2</code></li>
                   </ol>
+                  
+                  <div className="mt-3 p-2 bg-muted/50 rounded text-xs">
+                    <p className="font-medium mb-1">🔧 Troubleshooting:</p>
+                    <p>Bei Verbindungsproblemen testen Sie: <a 
+                      href={`${config.serverUrl}:${config.port}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-primary hover:underline"
+                    >
+                      {config.serverUrl}:{config.port}
+                    </a></p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

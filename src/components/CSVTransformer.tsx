@@ -1,947 +1,534 @@
 import React, { useState, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Upload,
-  FileText,
-  Settings,
-  Play,
-  Save,
-  Trash2,
-  Plus,
-  Download,
-  Merge,
-  Clock,
-  AlertCircle,
-  CheckCircle2
-} from 'lucide-react';
-import { fileProcessor, type CSVParseResult } from '@/lib/fileProcessor';
-import { 
-  transformationEngine, 
-  type CSVFile, 
-  type TransformationRecipe,
-  type ColumnMapping,
-  type NewColumn,
-  type ConditionalRule,
-  type CSVTemplate
-} from '@/lib/transformationEngine';
-import { useToast } from '@/hooks/use-toast';
-import LivePreview from '@/components/LivePreview';
-import TemplateManager from '@/components/TemplateManager';
+import { UploadCloud, BookText, ListChecks, Columns, LayoutTemplate, Save, RefreshCw } from 'lucide-react';
+import FileUpload from './FileUpload';
+import { CSVFile, TransformationRecipe, TemplateColumnMapping, NewColumn, ColumnMapping, CSVTemplate } from '@/lib/transformationEngine';
+import LivePreview from './LivePreview';
+import RecipeList from './RecipeList';
+import { useToast } from "@/hooks/use-toast"
 
-const CSVTransformer = () => {
-  const [csvFiles, setCsvFiles] = useState<CSVFile[]>([]);
+interface CSVTransformerProps {
+  files?: CSVFile[];
+  onTransform: (data: CSVFile) => void;
+  onRecipesChange: (recipes: TransformationRecipe[]) => void;
+}
+
+const CSVTransformer: React.FC<CSVTransformerProps> = ({
+  files = [],
+  onTransform,
+  onRecipesChange
+}) => {
+  const [activeTab, setActiveTab] = useState('upload');
+  const [recipeName, setRecipeName] = useState('');
+  const [recipeDescription, setRecipeDescription] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<CSVTemplate | null>(null);
   const [currentRecipe, setCurrentRecipe] = useState<Partial<TransformationRecipe>>({
     name: '',
     description: '',
-    sourceFiles: [],
     columnMappings: [],
     newColumns: [],
-    mergeStrategy: 'append',
     templateMappings: []
   });
-  const [selectedRecipeId, setSelectedRecipeId] = useState<string>('');
-  const [transformedData, setTransformedData] = useState<CSVFile | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<CSVTemplate | null>(null);
-  const { toast } = useToast();
+  const { toast } = useToast()
 
-  const recipes = transformationEngine.getRecipes();
-
-  // File Upload
-  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    setIsLoading(true);
-    const newFiles: CSVFile[] = [];
-
-    try {
-      for (const file of Array.from(files)) {
-        const result: CSVParseResult = await fileProcessor.parseCSV(file, {
-          delimiter: '',
-          hasHeaders: true,
-          skipEmptyLines: true
-        });
-
-        const csvFile: CSVFile = {
-          id: Math.random().toString(36).substring(2),
-          name: file.name,
-          headers: result.headers,
-          data: result.data
-        };
-
-        newFiles.push(csvFile);
-      }
-
-      setCsvFiles(prev => [...prev, ...newFiles]);
-      
-      toast({
-        title: "Dateien geladen",
-        description: `${newFiles.length} CSV-Datei(en) erfolgreich importiert`
-      });
-
-    } catch (error) {
-      toast({
-        title: "Import-Fehler",
-        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-
-  // Recipe Management
-  const saveCurrentRecipe = useCallback(() => {
-    if (!currentRecipe.name?.trim()) {
-      toast({
-        title: "Fehler",
-        description: "Please enter a recipe name",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      const recipe = transformationEngine.saveRecipe({
-        name: currentRecipe.name,
-        description: currentRecipe.description || '',
-        sourceFiles: currentRecipe.sourceFiles || [],
-        columnMappings: currentRecipe.columnMappings || [],
-        newColumns: currentRecipe.newColumns || [],
-        templateMappings: currentRecipe.templateMappings || [],
-        mergeStrategy: currentRecipe.mergeStrategy || 'append',
-        joinColumn: currentRecipe.joinColumn
-      });
-
-      toast({
-        title: "Rezept gespeichert",
-        description: `"${recipe.name}" wurde erfolgreich gespeichert`
-      });
-
-      setCurrentRecipe({
-        name: '',
-        description: '',
-        sourceFiles: [],
-        columnMappings: [],
-        newColumns: [],
-        templateMappings: [],
-        mergeStrategy: 'append'
-      });
-
-    } catch (error) {
-      toast({
-        title: "Speicher-Fehler",
-        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
-        variant: "destructive"
-      });
-    }
-  }, [currentRecipe, toast]);
-
-  const loadRecipe = useCallback((recipeId: string) => {
-    const recipe = transformationEngine.getRecipe(recipeId);
-    if (recipe) {
-      setCurrentRecipe(recipe);
-      setSelectedRecipeId(recipeId);
-    }
-  }, []);
-
-  const deleteRecipe = useCallback((recipeId: string) => {
-    if (transformationEngine.deleteRecipe(recipeId)) {
-      toast({
-        title: "Rezept gelöscht",
-        description: "Das Rezept wurde erfolgreich entfernt"
-      });
-      
-      if (selectedRecipeId === recipeId) {
-        setSelectedRecipeId('');
-        setCurrentRecipe({
-          name: '',
-          description: '',
-        sourceFiles: [],
-        columnMappings: [],
-        newColumns: [],
-        templateMappings: [],
-        mergeStrategy: 'append'
-        });
-      }
-    }
-  }, [selectedRecipeId, toast]);
-
-  // Transformation Logic
-  const applyTransformation = useCallback(() => {
-    if (csvFiles.length === 0) {
-      toast({
-        title: "Keine Dateien",
-        description: "Bitte laden Sie mindestens eine CSV-Datei hoch",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!currentRecipe.name) {
-      toast({
-        title: "Kein Rezept",
-        description: "Bitte erstellen Sie ein Rezept oder laden Sie ein bestehendes",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const result = transformationEngine.applyRecipe(csvFiles, currentRecipe as TransformationRecipe);
+  // Generate smart mapping suggestions based on source files
+  const getColumnSuggestions = (targetColumn: string): string[] => {
+    if (!files.length) return [];
     
-    if (result.success && result.data) {
-      setTransformedData(result.data);
-      toast({
-        title: "Transformation erfolgreich",
-        description: "Die Daten wurden erfolgreich transformiert"
-      });
+    // Get all unique column names from all source files
+    const allSourceColumns = files.flatMap(file => file.headers);
+    const uniqueColumns = [...new Set(allSourceColumns)];
+    
+    // Smart matching based on column name similarity
+    const suggestions = uniqueColumns
+      .map(sourceCol => ({
+        column: sourceCol,
+        score: calculateSimilarity(targetColumn.toLowerCase(), sourceCol.toLowerCase())
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5) // Top 5 suggestions
+      .map(item => item.column);
+    
+    return suggestions;
+  };
+
+  // Simple string similarity calculation
+  const calculateSimilarity = (str1: string, str2: string): number => {
+    // Exact match gets highest score
+    if (str1 === str2) return 100;
+    
+    // Check if one contains the other
+    if (str1.includes(str2) || str2.includes(str1)) return 80;
+    
+    // Check for common keywords
+    const commonTerms = ['name', 'email', 'phone', 'address', 'first', 'last', 'nummer', 'strasse', 'plz', 'ort'];
+    for (const term of commonTerms) {
+      if (str1.includes(term) && str2.includes(term)) return 60;
+    }
+    
+    // Basic character similarity
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    const editDistance = levenshteinDistance(longer, shorter);
+    return Math.max(0, ((longer.length - editDistance) / longer.length) * 40);
+  };
+
+  // Levenshtein distance for string similarity
+  const levenshteinDistance = (str1: string, str2: string): number => {
+    const matrix = [];
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[str2.length][str1.length];
+  };
+
+  const handleRecipeNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRecipeName(e.target.value);
+    setCurrentRecipe(prev => ({ ...prev, name: e.target.value }));
+  };
+
+  const handleRecipeDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setRecipeDescription(e.target.value);
+    setCurrentRecipe(prev => ({ ...prev, description: e.target.value }));
+  };
+
+  const handleColumnMappingChange = (index: number, field: keyof ColumnMapping, value: string) => {
+    const updatedMappings = [...(currentRecipe.columnMappings || [])];
+    updatedMappings[index] = { ...updatedMappings[index], [field]: value };
+    setCurrentRecipe(prev => ({ ...prev, columnMappings: updatedMappings }));
+  };
+
+  const handleNewColumnChange = (index: number, field: keyof NewColumn, value: string) => {
+    const updatedColumns = [...(currentRecipe.newColumns || [])];
+    updatedColumns[index] = { ...updatedColumns[index], [field]: value };
+    setCurrentRecipe(prev => ({ ...prev, newColumns: updatedColumns }));
+  };
+
+  const addColumnMapping = () => {
+    setCurrentRecipe(prev => ({
+      ...prev,
+      columnMappings: [...(prev.columnMappings || []), { sourceColumn: '', targetColumn: '' }]
+    }));
+  };
+
+  const addNewColumn = () => {
+    setCurrentRecipe(prev => ({
+      ...prev,
+      newColumns: [...(prev.newColumns || []), { name: '', type: 'fixed', value: '' }]
+    }));
+  };
+
+  const removeColumnMapping = (index: number) => {
+    const updatedMappings = [...(currentRecipe.columnMappings || [])];
+    updatedMappings.splice(index, 1);
+    setCurrentRecipe(prev => ({ ...prev, columnMappings: updatedMappings }));
+  };
+
+  const removeNewColumn = (index: number) => {
+    const updatedColumns = [...(currentRecipe.newColumns || [])];
+    updatedColumns.splice(index, 1);
+    setCurrentRecipe(prev => ({ ...prev, newColumns: updatedColumns }));
+  };
+
+  const handleTemplateSelect = (template: CSVTemplate) => {
+    setSelectedTemplate(template);
+    setCurrentRecipe(prev => ({
+      ...prev,
+      templateId: template.id,
+      templateMappings: template.headers.map(header => ({
+        targetColumn: header,
+        sourceType: 'column',
+        sourceColumn: ''
+      }))
+    }));
+  };
+
+  const updateTemplateMapping = (columnName: string, field: keyof TemplateColumnMapping, value: string | object | undefined) => {
+    const updatedMappings = [...(currentRecipe.templateMappings || [])];
+    const mappingIndex = updatedMappings.findIndex(m => m.targetColumn === columnName);
+
+    if (mappingIndex !== -1) {
+      updatedMappings[mappingIndex] = {
+        ...updatedMappings[mappingIndex],
+        [field]: value
+      };
+      setCurrentRecipe(prev => ({ ...prev, templateMappings: updatedMappings }));
     } else {
+      console.warn(`Mapping for column ${columnName} not found`);
+    }
+  };
+
+  const applyRecipe = useCallback(() => {
+    if (!selectedTemplate) {
       toast({
-        title: "Transformation fehlgeschlagen",
-        description: result.error || 'Unbekannter Fehler',
+        title: "Template fehlt",
+        description: "Bitte wählen Sie zuerst ein Template aus",
         variant: "destructive"
-      });
-    }
-  }, [csvFiles, currentRecipe, toast]);
-
-  // Column Mapping Management
-  const addColumnMapping = useCallback(() => {
-    setCurrentRecipe(prev => ({
-      ...prev,
-      columnMappings: [
-        ...(prev.columnMappings || []),
-        { sourceColumn: '', targetColumn: '' }
-      ]
-    }));
-  }, []);
-
-  const updateColumnMapping = useCallback((index: number, field: keyof ColumnMapping, value: string) => {
-    setCurrentRecipe(prev => ({
-      ...prev,
-      columnMappings: prev.columnMappings?.map((mapping, i) => 
-        i === index ? { ...mapping, [field]: value } : mapping
-      ) || []
-    }));
-  }, []);
-
-  const removeColumnMapping = useCallback((index: number) => {
-    setCurrentRecipe(prev => ({
-      ...prev,
-      columnMappings: prev.columnMappings?.filter((_, i) => i !== index) || []
-    }));
-  }, []);
-
-  // New Column Management
-  const addNewColumn = useCallback(() => {
-    setCurrentRecipe(prev => ({
-      ...prev,
-      newColumns: [
-        ...(prev.newColumns || []),
-        { name: '', type: 'fixed', value: '' }
-      ]
-    }));
-  }, []);
-
-  const updateNewColumn = useCallback((index: number, field: keyof NewColumn, value: any) => {
-    setCurrentRecipe(prev => ({
-      ...prev,
-      newColumns: prev.newColumns?.map((column, i) => 
-        i === index ? { ...column, [field]: value } : column
-      ) || []
-    }));
-  }, []);
-
-  const removeNewColumn = useCallback((index: number) => {
-    setCurrentRecipe(prev => ({
-      ...prev,
-      newColumns: prev.newColumns?.filter((_, i) => i !== index) || []
-    }));
-  }, []);
-
-  // Export transformed data
-  const exportTransformedData = useCallback((format: 'csv' | 'json') => {
-    if (!transformedData) return;
-
-    const timestamp = new Date().toISOString().split('T')[0];
-    const filename = `transformed_${transformedData.name}_${timestamp}`;
-
-    if (format === 'csv') {
-      fileProcessor.exportAsCSV(transformedData.data, transformedData.headers, `${filename}.csv`);
-    } else {
-      const jsonData = transformedData.data.map(row => {
-        const obj: Record<string, string> = {};
-        transformedData.headers.forEach((header, index) => {
-          obj[header] = row[index] || '';
-        });
-        return obj;
-      });
-
-      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { 
-        type: 'application/json;charset=utf-8;' 
-      });
-      
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `${filename}.json`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      })
+      return;
     }
 
-    toast({
-      title: "Export erfolgreich",
-      description: `Daten als ${format.toUpperCase()} exportiert`
-    });
-  }, [transformedData, toast]);
+    // Find the file that matches the template headers
+    const matchingFile = files.find(file =>
+      file.headers.length === selectedTemplate.headers.length &&
+      file.headers.every((header, index) => header === selectedTemplate.headers[index])
+    );
+
+    if (!matchingFile) {
+      toast({
+        title: "Datei-Fehler",
+        description: "Keine passende Datei für das ausgewählte Template gefunden",
+        variant: "destructive"
+      })
+      return;
+    }
+
+    onTransform(matchingFile);
+  }, [selectedTemplate, files, onTransform, toast]);
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
-      <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold bg-gradient-data bg-clip-text text-transparent">
-          CSV Transformer
-        </h1>
-        <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-          Erstellen Sie wiederverwendbare Rezepte für komplexe Daten-Transformationen. 
-          Kombinieren Sie Dateien, benennen Sie Spalten um und fügen Sie neue Daten hinzu.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <FileUpload />
 
-      <Tabs defaultValue="files" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="files">Dateien laden</TabsTrigger>
-          <TabsTrigger value="template">Template</TabsTrigger>
-          <TabsTrigger value="recipe">Rezept erstellen</TabsTrigger>
-          <TabsTrigger value="recipes">Gespeicherte Rezepte</TabsTrigger>
-          <TabsTrigger value="result">Ergebnis</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="upload">
+            <UploadCloud className="w-4 h-4 mr-2" />
+            Hochladen
+          </TabsTrigger>
+          <TabsTrigger value="recipe">
+            <BookText className="w-4 h-4 mr-2" />
+            Rezept erstellen
+          </TabsTrigger>
+          <TabsTrigger value="mapping">
+            <Columns className="w-4 h-4 mr-2" />
+            Spalten-Mapping
+          </TabsTrigger>
+          <TabsTrigger value="template">
+            <LayoutTemplate className="w-4 h-4 mr-2" />
+            Template
+          </TabsTrigger>
         </TabsList>
 
-        {/* File Upload Tab */}
-        <TabsContent value="files">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="shadow-elegant">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Upload className="w-5 h-5" />
-                  CSV-Dateien hochladen
-                </CardTitle>
-                <CardDescription>
-                  Laden Sie eine oder mehrere CSV-Dateien für die Transformation
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-                  <input
-                    type="file"
-                    accept=".csv,.tsv"
-                    multiple
-                    onChange={handleFileUpload}
-                    disabled={isLoading}
-                    className="hidden"
-                    id="csv-upload"
-                  />
-                  <Label htmlFor="csv-upload" className="cursor-pointer">
-                    <div className="space-y-2">
-                      <FileText className="w-12 h-12 mx-auto text-muted-foreground" />
-                      <p className="text-lg font-medium">
-                        {isLoading ? 'Dateien werden verarbeitet...' : 'CSV-Dateien hier ablegen oder auswählen'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Mehrere Dateien gleichzeitig möglich (.csv, .tsv)
-                      </p>
-                    </div>
-                  </Label>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Geladene Dateien ({csvFiles.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {csvFiles.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    Noch keine Dateien geladen
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {csvFiles.map((file) => (
-                      <div key={file.id} className="flex items-center justify-between p-3 border rounded">
-                        <div>
-                          <div className="font-medium">{file.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {file.data.length} Zeilen, {file.headers.length} Spalten
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCsvFiles(prev => prev.filter(f => f.id !== file.id))}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="upload" className="space-y-4">
+          <Card className="shadow-elegant">
+            <CardHeader>
+              <CardTitle>Dateien hochladen</CardTitle>
+              <CardDescription>
+                Laden Sie Ihre CSV-Dateien hoch, um die Transformation zu starten
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p>Drag & Drop oder klicke zum Hochladen</p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        {/* Template Tab */}
-        <TabsContent value="template">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <TemplateManager onTemplateSelect={setSelectedTemplate} />
-            
-            {selectedTemplate && (
-              <Card className="shadow-elegant">
-                <CardHeader>
-                  <CardTitle>Template-Mapping: {selectedTemplate.name}</CardTitle>
-                  <CardDescription>
-                    Definieren Sie für jede Template-Spalte, welche Daten verwendet werden sollen
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {selectedTemplate.headers.map((header, index) => (
-                      <div key={index} className="p-3 border rounded space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label className="font-medium">{header}</Label>
-                          <Badge variant="outline">
-                            {String.fromCharCode(65 + index)}1
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2">
+        <TabsContent value="recipe" className="space-y-6">
+          <Card className="shadow-elegant">
+            <CardHeader>
+              <CardTitle>Rezept erstellen</CardTitle>
+              <CardDescription>
+                Definieren Sie ein neues Transformationsrezept
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4">
+                <div>
+                  <Label htmlFor="recipe-name">Rezeptname</Label>
+                  <Input
+                    type="text"
+                    id="recipe-name"
+                    value={recipeName}
+                    onChange={handleRecipeNameChange}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="recipe-description">Beschreibung</Label>
+                  <Textarea
+                    id="recipe-description"
+                    value={recipeDescription}
+                    onChange={handleRecipeDescriptionChange}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="mapping" className="space-y-6">
+          <Card className="shadow-elegant">
+            <CardHeader>
+              <CardTitle>Spalten-Mapping konfigurieren</CardTitle>
+              <CardDescription>
+                Ordnen Sie Quellspalten Zielspalten zu
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentRecipe.columnMappings &&
+                currentRecipe.columnMappings.map((mapping, index) => (
+                  <div key={index} className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Quellspalte</Label>
+                      <Input
+                        type="text"
+                        value={mapping.sourceColumn || ''}
+                        onChange={(e) => handleColumnMappingChange(index, 'sourceColumn', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Zielspalte</Label>
+                      <Input
+                        type="text"
+                        value={mapping.targetColumn || ''}
+                        onChange={(e) => handleColumnMappingChange(index, 'targetColumn', e.target.value)}
+                      />
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => removeColumnMapping(index)}>
+                      Entfernen
+                    </Button>
+                  </div>
+                ))}
+              <Button variant="outline" onClick={addColumnMapping}>
+                Mapping hinzufügen
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-elegant">
+            <CardHeader>
+              <CardTitle>Neue Spalten hinzufügen</CardTitle>
+              <CardDescription>
+                Erstellen Sie neue Spalten mit festen Werten
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentRecipe.newColumns &&
+                currentRecipe.newColumns.map((column, index) => (
+                  <div key={index} className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label>Spaltenname</Label>
+                      <Input
+                        type="text"
+                        value={column.name || ''}
+                        onChange={(e) => handleNewColumnChange(index, 'name', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Typ</Label>
+                      <Select
+                        value={column.type || 'fixed'}
+                        onValueChange={(value) => handleNewColumnChange(index, 'type', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Typ wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="fixed">Fest</SelectItem>
+                          <SelectItem value="formula">Formel</SelectItem>
+                          <SelectItem value="conditional">Bedingt</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Wert</Label>
+                      <Input
+                        type="text"
+                        value={column.value || ''}
+                        onChange={(e) => handleNewColumnChange(index, 'value', e.target.value)}
+                      />
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => removeNewColumn(index)}>
+                      Entfernen
+                    </Button>
+                  </div>
+                ))}
+              <Button variant="outline" onClick={addNewColumn}>
+                Neue Spalte hinzufügen
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="template" className="space-y-6">
+          <RecipeList onTemplateSelect={handleTemplateSelect} />
+
+          {selectedTemplate && (
+            <Card className="shadow-elegant">
+              <CardHeader>
+                <CardTitle>Spalten-Mapping konfigurieren</CardTitle>
+                <CardDescription>
+                  Definieren Sie, wie die Daten in jede Zielspalte gemappt werden sollen
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {selectedTemplate.headers.map((columnName, index) => {
+                  const mapping = currentRecipe.templateMappings?.find(m => m.targetColumn === columnName);
+                  const suggestions = getColumnSuggestions(columnName);
+                  
+                  return (
+                    <div key={index} className="p-4 border rounded-lg space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="font-medium text-base">{columnName}</Label>
+                        <Badge variant="outline" className="text-xs">
+                          Spalte {String.fromCharCode(65 + index)}
+                        </Badge>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm">Mapping-Typ</Label>
                           <Select
-                            value={currentRecipe.templateMappings?.find(m => m.targetColumn === header)?.sourceType || ''}
-                            onValueChange={(value) => {
-                              const newMappings = [...(currentRecipe.templateMappings || [])];
-                              const existingIndex = newMappings.findIndex(m => m.targetColumn === header);
-                              
-                              if (existingIndex !== -1) {
-                                newMappings[existingIndex] = { 
-                                  ...newMappings[existingIndex], 
-                                  sourceType: value as any 
-                                };
-                              } else {
-                                newMappings.push({ 
-                                  targetColumn: header, 
-                                  sourceType: value as any 
-                                });
-                              }
-                              
-                              setCurrentRecipe(prev => ({ 
-                                ...prev, 
-                                templateId: selectedTemplate.id,
-                                templateMappings: newMappings 
-                              }));
-                            }}
+                            value={mapping?.sourceType || 'column'}
+                            onValueChange={(value: any) => updateTemplateMapping(columnName, 'sourceType', value)}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Quelle wählen" />
+                              <SelectValue placeholder="Wählen Sie den Typ" />
                             </SelectTrigger>
-                            <SelectContent className="bg-popover border-border shadow-lg z-50">
-                              <SelectItem value="column">Spalte</SelectItem>
+                            <SelectContent>
+                              <SelectItem value="column">Quell-Spalte</SelectItem>
                               <SelectItem value="formula">Formel</SelectItem>
                               <SelectItem value="fixed">Fester Wert</SelectItem>
                               <SelectItem value="conditional">Bedingt</SelectItem>
                             </SelectContent>
                           </Select>
-                          
-                          {(() => {
-                            const mapping = currentRecipe.templateMappings?.find(m => m.targetColumn === header);
-                            const updateMapping = (field: string, value: any) => {
-                              const newMappings = [...(currentRecipe.templateMappings || [])];
-                              const existingIndex = newMappings.findIndex(m => m.targetColumn === header);
-                              
-                              if (existingIndex !== -1) {
-                                newMappings[existingIndex] = { 
-                                  ...newMappings[existingIndex], 
-                                  [field]: value 
-                                };
-                              } else {
-                                newMappings.push({ 
-                                  targetColumn: header, 
-                                  sourceType: 'column',
-                                  [field]: value 
-                                });
-                              }
-                              
-                              setCurrentRecipe(prev => ({ 
-                                ...prev, 
-                                templateId: selectedTemplate.id,
-                                templateMappings: newMappings 
-                              }));
-                            };
-                            
-                            switch (mapping?.sourceType) {
-                              case 'column':
-                                return (
-                                  <Select
-                                    value={mapping.sourceColumn || ''}
-                                    onValueChange={(value) => updateMapping('sourceColumn', value)}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Quell-Spalte" />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-popover border-border shadow-lg z-50">
-                                      {csvFiles.flatMap(file => 
-                                        file.headers.map(h => (
-                                          <SelectItem key={`${file.id}-${h}`} value={h}>
-                                            {h} ({file.name})
-                                          </SelectItem>
-                                        ))
-                                      )}
-                                    </SelectContent>
-                                  </Select>
-                                );
-                              case 'formula':
-                                return (
-                                  <Input
-                                    value={mapping.formula || ''}
-                                    onChange={(e) => updateMapping('formula', e.target.value)}
-                                    placeholder='=A1&"@domain.com"'
-                                  />
-                                );
-                              case 'fixed':
-                                return (
-                                  <Input
-                                    value={mapping.fixedValue || ''}
-                                    onChange={(e) => updateMapping('fixedValue', e.target.value)}
-                                    placeholder="Fester Wert"
-                                  />
-                                );
-                              default:
-                                return <div className="h-9" />;
-                            }
-                          })()}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* Recipe Creation Tab */}
-        <TabsContent value="recipe">
-          <div className="space-y-6">
-            {/* Recipe Basic Info */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Rezept-Informationen</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label>Rezept-Name</Label>
-                        <Input
-                          value={currentRecipe.name || ''}
-                          onChange={(e) => setCurrentRecipe(prev => ({ ...prev, name: e.target.value }))}
-                          placeholder="z.B. Schulverwaltung zu Relution"
-                        />
-                      </div>
-                      <div>
-                        <Label>Merge-Strategie</Label>
-                        <Select
-                          value={currentRecipe.mergeStrategy || 'append'}
-                          onValueChange={(value: 'append' | 'join') => 
-                            setCurrentRecipe(prev => ({ ...prev, mergeStrategy: value }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-popover border-border shadow-lg z-50">
-                            <SelectItem value="append">Anhängen (Append)</SelectItem>
-                            <SelectItem value="join">Verknüpfen (Join)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {currentRecipe.mergeStrategy === 'join' && (
-                      <div>
-                        <Label>Join-Spalte</Label>
-                        <Input
-                          value={currentRecipe.joinColumn || ''}
-                          onChange={(e) => setCurrentRecipe(prev => ({ ...prev, joinColumn: e.target.value }))}
-                          placeholder="Spaltenname für Verknüpfung"
-                        />
-                      </div>
-                    )}
-
-                    <div>
-                      <Label>Beschreibung</Label>
-                      <Textarea
-                        value={currentRecipe.description || ''}
-                        onChange={(e) => setCurrentRecipe(prev => ({ ...prev, description: e.target.value }))}
-                        placeholder="Beschreibung des Transformation-Rezepts..."
-                        rows={3}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-            
-            <div className="mt-6">
-              <LivePreview files={csvFiles} recipe={currentRecipe} maxRows={10} />
-            </div>
-
-            {/* Column Mappings */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Spalten umbenennen
-                  <Button onClick={addColumnMapping} size="sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Mapping hinzufügen
-                  </Button>
-                </CardTitle>
-                <CardDescription>
-                  Benennen Sie Spalten um (z.B. "Nachname" → "surname")
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {currentRecipe.columnMappings?.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-4">
-                    Keine Spalten-Mappings definiert
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {currentRecipe.columnMappings?.map((mapping, index) => (
-                      <div key={index} className="flex items-center gap-3">
-                        <Input
-                          value={mapping.sourceColumn}
-                          onChange={(e) => updateColumnMapping(index, 'sourceColumn', e.target.value)}
-                          placeholder="Quell-Spalte"
-                        />
-                        <span className="text-muted-foreground">→</span>
-                        <Input
-                          value={mapping.targetColumn}
-                          onChange={(e) => updateColumnMapping(index, 'targetColumn', e.target.value)}
-                          placeholder="Ziel-Spalte"
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeColumnMapping(index)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* New Columns */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Neue Spalten hinzufügen
-                  <Button onClick={addNewColumn} size="sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Spalte hinzufügen
-                  </Button>
-                </CardTitle>
-                <CardDescription>
-                  Erstellen Sie neue Spalten mit festen Werten, Formeln oder bedingter Logik
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {currentRecipe.newColumns?.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-4">
-                    Keine neuen Spalten definiert
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {currentRecipe.newColumns?.map((column, index) => (
-                      <div key={index} className="p-4 border rounded space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 flex-1">
-                            <Input
-                              value={column.name}
-                              onChange={(e) => updateNewColumn(index, 'name', e.target.value)}
-                              placeholder="Spalten-Name"
-                              className="max-w-xs"
-                            />
-                            <Select
-                              value={column.type}
-                              onValueChange={(value) => updateNewColumn(index, 'type', value)}
-                            >
-                              <SelectTrigger className="max-w-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="bg-popover border-border shadow-lg z-50">
-                                <SelectItem value="fixed">Fester Wert</SelectItem>
-                                <SelectItem value="formula">Formel</SelectItem>
-                                <SelectItem value="conditional">Bedingt</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeNewColumn(index)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
                         </div>
 
-                        {column.type === 'fixed' && (
-                          <Input
-                            value={column.value || ''}
-                            onChange={(e) => updateNewColumn(index, 'value', e.target.value)}
-                            placeholder="Fester Wert (z.B. 'passw0rd')"
-                          />
-                        )}
-
-                        {column.type === 'formula' && (
-                          <div>
-                            <Input
-                              value={column.formula || ''}
-                              onChange={(e) => updateNewColumn(index, 'formula', e.target.value)}
-                              placeholder='=A1&"@appleid.ds-greiz.de" oder =[firstName]&"@"&[domain]'
-                            />
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Verwenden Sie Excel-Syntax: =A1&"text" oder Named-Referenzen: [SpaltenName]&"text"
-                            </p>
-                          </div>
-                        )}
-
-                        {column.type === 'conditional' && (
-                          <div className="space-y-2">
-                            <p className="text-sm font-medium">Bedingte Regeln:</p>
-                            {column.conditions?.map((condition, condIndex) => (
-                              <div key={condIndex} className="flex items-center gap-2">
-                                <Input
-                                  value={condition.condition}
-                                  onChange={(e) => {
-                                    const newConditions = [...(column.conditions || [])];
-                                    newConditions[condIndex] = { ...condition, condition: e.target.value };
-                                    updateNewColumn(index, 'conditions', newConditions);
-                                  }}
-                                  placeholder="Bedingung (z.B. [role] === 'Lehrer')"
-                                  className="flex-1"
-                                />
-                                <span className="text-muted-foreground">→</span>
-                                <Input
-                                  value={condition.value}
-                                  onChange={(e) => {
-                                    const newConditions = [...(column.conditions || [])];
-                                    newConditions[condIndex] = { ...condition, value: e.target.value };
-                                    updateNewColumn(index, 'conditions', newConditions);
-                                  }}
-                                  placeholder="Wert"
-                                  className="flex-1"
-                                />
-                              </div>
-                            )) || null}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const newConditions = [...(column.conditions || []), { condition: '', value: '' }];
-                                updateNewColumn(index, 'conditions', newConditions);
-                              }}
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Regel hinzufügen
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3">
-              <Button onClick={saveCurrentRecipe} className="flex-1">
-                <Save className="w-4 h-4 mr-2" />
-                Rezept speichern
-              </Button>
-              <Button onClick={applyTransformation} variant="outline" className="flex-1">
-                <Play className="w-4 h-4 mr-2" />
-                Transformation anwenden
-              </Button>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* Saved Recipes Tab */}
-        <TabsContent value="recipes">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gespeicherte Rezepte ({recipes.length})</CardTitle>
-              <CardDescription>
-                Laden oder verwalten Sie Ihre gespeicherten Transformation-Rezepte
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {recipes.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  Noch keine Rezepte gespeichert
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {recipes.map((recipe) => (
-                    <div key={recipe.id} className="p-4 border rounded space-y-2">
-                      <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="font-medium">{recipe.name}</h3>
-                          <p className="text-sm text-muted-foreground">{recipe.description}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">
-                            {recipe.columnMappings.length} Mappings
-                          </Badge>
-                          <Badge variant="outline">
-                            {recipe.newColumns.length} Neue Spalten
-                          </Badge>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          Erstellt: {recipe.created.toLocaleDateString()}
-                          {recipe.lastUsed && (
-                            <span className="ml-2">
-                              Zuletzt verwendet: {recipe.lastUsed.toLocaleDateString()}
-                            </span>
+                          {mapping?.sourceType === 'column' && (
+                            <div className="space-y-2">
+                              <Label className="text-sm">Quell-Spalte</Label>
+                              <Select
+                                value={mapping?.sourceColumn || ''}
+                                onValueChange={(value) => updateTemplateMapping(columnName, 'sourceColumn', value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Spalte wählen" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {files.flatMap(file => 
+                                    file.headers.map(header => (
+                                      <SelectItem key={`${file.name}-${header}`} value={header}>
+                                        <div className="flex items-center justify-between w-full">
+                                          <span>{header}</span>
+                                          <Badge variant="outline" className="ml-2 text-xs">
+                                            {file.name}
+                                          </Badge>
+                                        </div>
+                                      </SelectItem>
+                                    ))
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              
+                              {suggestions.length > 0 && (
+                                <div className="space-y-1">
+                                  <Label className="text-xs text-muted-foreground">Vorschläge:</Label>
+                                  <div className="flex flex-wrap gap-1">
+                                    {suggestions.map((suggestion, idx) => (
+                                      <Button
+                                        key={idx}
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-6 px-2 text-xs"
+                                        onClick={() => updateTemplateMapping(columnName, 'sourceColumn', suggestion)}
+                                      >
+                                        {suggestion}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {mapping?.sourceType === 'formula' && (
+                            <div>
+                              <Label className="text-sm">Formel (Excel-Syntax)</Label>
+                              <Input
+                                value={mapping?.formula || ''}
+                                onChange={(e) => updateTemplateMapping(columnName, 'formula', e.target.value)}
+                                placeholder='z.B. =A1&"@example.com" oder [vorname]&" "&[nachname]'
+                                className="font-mono text-sm"
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Verwenden Sie [spaltenname] oder A1-Referenzen
+                              </p>
+                            </div>
+                          )}
+
+                          {mapping?.sourceType === 'fixed' && (
+                            <div>
+                              <Label className="text-sm">Fester Wert</Label>
+                              <Input
+                                value={mapping?.fixedValue || ''}
+                                onChange={(e) => updateTemplateMapping(columnName, 'fixedValue', e.target.value)}
+                                placeholder="Konstanter Wert für alle Zeilen"
+                              />
+                            </div>
+                          )}
+
+                          {mapping?.sourceType === 'conditional' && (
+                            <div>
+                              <Label className="text-sm">Bedingte Logik</Label>
+                              <Input
+                                value={mapping?.conditions?.[0]?.condition || ''}
+                                onChange={(e) => updateTemplateMapping(columnName, 'conditions', [{ 
+                                  condition: e.target.value, 
+                                  value: mapping?.conditions?.[0]?.value || '' 
+                                }])}
+                                placeholder='z.B. [rolle] === "Admin"'
+                                className="mb-2"
+                              />
+                              <Input
+                                value={mapping?.conditions?.[0]?.value || ''}
+                                onChange={(e) => updateTemplateMapping(columnName, 'conditions', [{ 
+                                  condition: mapping?.conditions?.[0]?.condition || '', 
+                                  value: e.target.value 
+                                }])}
+                                placeholder="Wert wenn Bedingung erfüllt"
+                              />
+                            </div>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => loadRecipe(recipe.id)}
-                          >
-                            Laden
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => deleteRecipe(recipe.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Result Tab */}
-        <TabsContent value="result">
-          <div className="space-y-6">
-            {transformedData ? (
-              <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5 text-success" />
-                      Transformation erfolgreich
-                    </CardTitle>
-                    <CardDescription>
-                      {transformedData.data.length} Zeilen, {transformedData.headers.length} Spalten
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-auto max-h-96 border rounded">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted sticky top-0">
-                          <tr>
-                            {transformedData.headers.map((header, index) => (
-                              <th key={index} className="p-2 text-left font-medium border-r">
-                                {header}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {transformedData.data.slice(0, 50).map((row, rowIndex) => (
-                            <tr key={rowIndex} className="border-b hover:bg-muted/50">
-                              {row.map((cell, cellIndex) => (
-                                <td key={cellIndex} className="p-2 border-r">
-                                  {cell || '-'}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {transformedData.data.length > 50 && (
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Zeige erste 50 von {transformedData.data.length} Zeilen
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Export</CardTitle>
-                    <CardDescription>
-                      Exportieren Sie die transformierten Daten
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Button onClick={() => exportTransformedData('csv')} className="h-20 flex-col gap-2">
-                        <FileText className="w-6 h-6" />
-                        Als CSV exportieren
-                        <span className="text-xs text-muted-foreground">Für Excel und andere Tools</span>
-                      </Button>
-                      
-                      <Button onClick={() => exportTransformedData('json')} variant="outline" className="h-20 flex-col gap-2">
-                        <Settings className="w-6 h-6" />
-                        Als JSON exportieren
-                        <span className="text-xs text-muted-foreground">Für APIs und Entwicklung</span>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            ) : (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Keine Transformation durchgeführt</h3>
-                  <p className="text-muted-foreground">
-                    Laden Sie Dateien und erstellen Sie ein Rezept, um mit der Transformation zu beginnen.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                  );
+                })}
+                
+                <Button 
+                  onClick={applyRecipe} 
+                  className="w-full" 
+                  disabled={!selectedTemplate}
+                >
+                  Template anwenden
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
