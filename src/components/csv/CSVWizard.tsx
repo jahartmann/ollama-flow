@@ -421,6 +421,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
                   originalFiles={files}
                   processedData={processedData}
                   selectedTemplate={selectedTemplate}
+                  columnMappings={columnMappings}
                   onExport={handleExport}
                   onBack={goToPreviousStep}
                   onFinish={handleFinish}

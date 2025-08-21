@@ -259,43 +259,67 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
         throw new Error('Keine Verbindung zu Ollama. Stellen Sie sicher, dass Ollama läuft.');
       }
 
-      // Enhanced intelligent prompt for automatic mapping
+      // Enhanced intelligent prompt for automatic mapping with better similarity detection
       const mappingPrompt = `
-AUFGABE: Intelligente automatische Spalten-Mappings für CSV-Transformation
+AUFGABE: Hochpräzise automatische Spalten-Mappings für CSV-Transformation
 
 QUELLDATEN-SPALTEN: ${sourceData.headers.join(', ')}
 ZIEL-TEMPLATE-SPALTEN: ${selectedTemplate.columns?.map(c => c.name).join(', ')}
 
 BENUTZER-ANWEISUNG: ${userInstruction}
 
-INTELLIGENTE MAPPING-REGELN:
-1. Erkenne ähnliche Spaltennamen (z.B. "Name" → "Vorname", "Email" → "E-Mail", "Tel" → "Telefon")
-2. Verwende Teilstring-Matching (z.B. "kunde_name" → "Name")
-3. Erkenne häufige Variationen (deutsch/englisch: "Phone" → "Telefon", "Address" → "Adresse")
-4. Automatische Transformationen: Telefonnummern formatieren, Namen normalisieren
-5. Hohe Confidence (>90) für exakte/ähnliche Matches, niedrige (<70) für unsichere
+ERWEITERTE INTELLIGENTE MAPPING-REGELN:
+1. EXAKTE MATCHES (100% Confidence): Identische Spaltennamen (case-insensitive)
+2. HÖCHSTE ÄHNLICHKEIT (95% Confidence): 
+   - Substring-Matching: "kunde_name" → "Name", "email_address" → "Email"
+   - Teilwörter: "Vorname" ↔ "First_Name", "Nachname" ↔ "Last_Name"
+3. SPRACHVARIATIONEN (90% Confidence):
+   - Deutsch/Englisch: "Telefon" ↔ "Phone", "Adresse" ↔ "Address", "Straße" ↔ "Street"
+   - Abkürzungen: "Tel" ↔ "Telefon", "Mail" ↔ "E-Mail", "Nr" ↔ "Nummer"
+4. SEMANTISCHE ÄHNLICHKEIT (85% Confidence):
+   - "Name" kann zu "Vorname" oder "Nachname" gemappt werden
+   - "Contact" kann zu "Telefon" oder "E-Mail" gemappt werden
+5. AUTOMATISCHE TRANSFORMATIONEN basierend auf Inhaltstyp:
+   - Telefonnummern: format_phone für Felder mit "phone", "tel", "telefon"
+   - Namen: uppercase für Nachnamen, lowercase für E-Mails
+   - Texte: trim für alle String-Felder
 
-BEISPIEL-MAPPINGS:
-- "Vorname" ↔ "Name", "FirstName", "fname"
-- "E-Mail" ↔ "Email", "Mail", "email_address"
-- "Telefon" ↔ "Phone", "Tel", "telefon_nr"
-- "Straße" ↔ "Street", "Address", "adresse"
+ERWEITERTE BEISPIEL-MAPPINGS:
+- "Vorname" ↔ "Name", "FirstName", "fname", "first_name", "vname"
+- "Nachname" ↔ "LastName", "Surname", "lname", "last_name", "nname", "familienname"
+- "E-Mail" ↔ "Email", "Mail", "email_address", "mail_address", "kontakt_email"
+- "Telefon" ↔ "Phone", "Tel", "telefon_nr", "phone_number", "contact_phone", "mobile"
+- "Straße" ↔ "Street", "Address", "adresse", "street_address", "strasse"
+- "PLZ" ↔ "PostalCode", "ZIP", "postal_code", "zip_code", "postleitzahl"
+- "Stadt" ↔ "City", "Ort", "place", "location"
+- "Land" ↔ "Country", "nation", "staat"
+
+INTELLIGENTE ANALYSE-SCHRITTE:
+1. Führe für jede Template-Spalte eine Ähnlichkeitsanalyse mit allen Quell-Spalten durch
+2. Berechne Ähnlichkeits-Score basierend auf Substring, Levenshtein-Distanz und semantischen Regeln
+3. Wähle die beste Übereinstimmung mit höchstem Confidence-Score
+4. Schlage passende Transformationen basierend auf Datentyp vor
 
 Erstelle eine JSON-Antwort im folgenden Format:
 {
   "mappings": [
     {
-      "templateColumn": "Ziel-Spaltenname",
-      "sourceColumn": "Quell-Spaltenname oder leer",
+      "templateColumn": "Exakter Ziel-Spaltenname",
+      "sourceColumn": "Bester Match aus Quell-Spalten oder leer wenn kein guter Match",
       "transformation": "direct|uppercase|lowercase|trim|format_phone",
-      "defaultValue": "Standard-Wert falls keine Quelle",
-      "confidence": 0-100
+      "defaultValue": "Sinnvoller Standard-Wert falls keine passende Quelle",
+      "confidence": 0-100,
+      "reasoning": "Kurze Erklärung warum diese Zuordnung gewählt wurde"
     }
   ],
-  "explanation": "Erklärung der automatischen Mappings"
+  "explanation": "Zusammenfassung der automatischen Mappings mit Anzahl der erfolgreichen Zuordnungen"
 }
 
-Wichtig: Verwende nur existierende Spaltennamen. Mappe so viele Felder wie möglich automatisch.
+WICHTIG: 
+- Verwende NUR existierende Spaltennamen aus den Listen oben
+- Mappe nur mit Confidence > 80, sonst leer lassen  
+- Priorisiere hohe Genauigkeit über Vollständigkeit
+- Erkenne ähnliche Begriffe auch in zusammengesetzten Wörtern
       `;
 
       const result = await ollamaAPI.generateCompletion(mappingPrompt);
