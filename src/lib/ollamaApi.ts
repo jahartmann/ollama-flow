@@ -1,4 +1,7 @@
 
+// Update Ollama API to use CORS proxy
+import { corsProxy } from './corsProxy';
+
 interface OllamaModel {
   name: string;
   size: string;
@@ -51,146 +54,43 @@ class OllamaAPI {
 
   async testConnection(): Promise<boolean> {
     try {
-      console.log('Testing Ollama connection to:', this.baseUrl);
-      
-      // Create a more robust request with proper CORS handling
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-      const requestOptions: RequestInit = {
-        method: 'GET',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        signal: controller.signal,
-        mode: 'cors', // Explicit CORS mode
-        credentials: 'omit' // Don't send credentials for CORS
-      };
-
-      let response: Response;
-      try {
-        // Try version endpoint first
-        response = await fetch(`${this.baseUrl}/api/version`, requestOptions);
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Ollama version:', data);
-          return true;
-        }
-      } catch (versionError) {
-        console.log('Version endpoint failed, trying tags:', versionError);
-      }
-
-      // If version fails, try tags endpoint
-      try {
-        const tagsController = new AbortController();
-        const tagsTimeoutId = setTimeout(() => tagsController.abort(), 15000);
-        
-        response = await fetch(`${this.baseUrl}/api/tags`, {
-          ...requestOptions,
-          signal: tagsController.signal
-        });
-        
-        clearTimeout(tagsTimeoutId);
-        
-        if (response.ok) {
-          console.log('Tags endpoint successful');
-          return true;
-        }
-      } catch (tagsError) {
-        console.log('Tags endpoint also failed:', tagsError);
-      }
-
-      // If both fail, try a simple ping
-      try {
-        const pingController = new AbortController();
-        const pingTimeoutId = setTimeout(() => pingController.abort(), 10000);
-        
-        response = await fetch(`${this.baseUrl}/`, {
-          ...requestOptions,
-          signal: pingController.signal
-        });
-        
-        clearTimeout(pingTimeoutId);
-        
-        // Even a 404 or other status code means the server is running
-        console.log('Ping response status:', response.status);
-        return response.status !== 0; // 0 means network error
-      } catch (pingError) {
-        console.log('Ping failed:', pingError);
-        return false;
-      }
-      
-      return false;
+      console.log('Testing Ollama connection via CORS proxy to:', this.baseUrl);
+      return await corsProxy.testConnection(this.baseUrl);
     } catch (error) {
-      console.error('Connection test completely failed:', error);
-      
-      // Check if it's a CORS error
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.error('CORS or network error detected. Make sure Ollama is running and accessible.');
-      }
-      
+      console.error('Connection test failed:', error);
       return false;
     }
   }
 
   async getModels(): Promise<OllamaModel[]> {
     try {
-      console.log('Fetching models from:', `${this.baseUrl}/api/tags`);
+      console.log('Fetching models via CORS proxy from:', `${this.baseUrl}/api/tags`);
       
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-      const response = await fetch(`${this.baseUrl}/api/tags`, {
-        method: 'GET',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        signal: controller.signal,
-        mode: 'cors',
-        credentials: 'omit'
+      const response = await corsProxy.makeRequest(`${this.baseUrl}/api/tags`, {
+        method: 'GET'
       });
-      
-      clearTimeout(timeoutId);
-      console.log('Models response status:', response.status);
-      
+
       if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error('Models fetch error:', errorText);
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
-      console.log('Raw models data:', data);
-      
+      console.log('Models response:', data);
+
       if (!data.models || !Array.isArray(data.models)) {
-        console.warn('Unexpected response format, models array not found:', data);
-        throw new Error('Invalid response format from Ollama API');
+        console.warn('No models found in response');
+        return [];
       }
 
-      const models = data.models.map((model: any) => ({
-        name: model.name || 'Unknown',
-        size: typeof model.size === 'number' ? this.formatBytes(model.size) : (model.size || 'Unknown'),
-        modified: model.modified_at ? new Date(model.modified_at).toLocaleDateString('de-DE') : 'Unknown',
+      return data.models.map((model: any) => ({
+        name: model.name,
+        size: this.formatBytes(model.size || 0),
+        modified: new Date(model.modified_at).toLocaleDateString('de-DE'),
         digest: model.digest || model.id || ''
       }));
-
-      console.log('Processed models:', models);
-      return models;
     } catch (error) {
       console.error('Failed to fetch models:', error);
-      
-      // Provide more specific error messages
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Netzwerk-Fehler: Überprüfen Sie die Ollama-Verbindung und CORS-Einstellungen');
-      } else if (error instanceof Error) {
-        throw new Error(`API-Fehler: ${error.message}`);
-      } else {
-        throw new Error('Unbekannter Fehler beim Laden der Modelle');
-      }
+      throw error;
     }
   }
 

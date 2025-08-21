@@ -158,7 +158,7 @@ export class TransformationEngine {
       if (files.length === 1) {
         workingData = { ...files[0] };
       } else {
-        workingData = this.mergeFiles(files, recipe);
+        workingData = this.mergeFilesForRecipe(files, recipe);
       }
 
       // Step 2: Apply template-based transformation if template is specified
@@ -189,7 +189,19 @@ export class TransformationEngine {
     }
   }
 
-  private mergeFiles(files: CSVFile[], recipe: TransformationRecipe): CSVFile {
+  // Public method for CSV wizard - handles merging files
+  public mergeFiles(files: CSVFile[], operation: 'append' | 'join', joinColumn?: string): CSVFile {
+    if (operation === 'append') {
+      return this.appendFiles(files);
+    } else if (operation === 'join' && joinColumn) {
+      return this.joinFiles(files, joinColumn);
+    } else {
+      throw new Error('Invalid merge operation or missing join column');
+    }
+  }
+
+  // Private method for recipe-based merging  
+  private mergeFilesForRecipe(files: CSVFile[], recipe: TransformationRecipe): CSVFile {
     if (recipe.mergeStrategy === 'join' && recipe.joinColumn) {
       return this.joinFiles(files, recipe.joinColumn);
     } else {

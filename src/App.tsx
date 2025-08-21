@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navigation from "@/components/Navigation";
-import CSVTransformer from "@/components/CSVTransformer";
+import CSVWizard from "@/components/csv/CSVWizard";
 import Settings from "@/components/Settings";
 import UpdateNotification from "@/components/UpdateNotification";
 import { useUpdateChecker } from "@/hooks/useUpdateChecker";
@@ -40,9 +40,8 @@ const AppContent = () => {
         <Route 
           path="/" 
           element={
-            <CSVTransformer 
-              onTransform={handleTransform}
-              onRecipesChange={handleRecipesChange}
+            <CSVWizard 
+              onComplete={handleTransform}
             />
           } 
         />
