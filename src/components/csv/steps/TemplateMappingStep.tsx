@@ -250,38 +250,91 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
 
     setIsAiProcessing(true);
     try {
-      // Send mapping request to AI
-      const prompt = `
-Basierend auf diesen Quelldaten-Spalten: ${sourceData.headers.join(', ')}
-Und diesen Ziel-Template-Spalten: ${selectedTemplate.columns?.map(c => c.name).join(', ')}
+      // Check if Ollama is connected first
+      const isConnected = await ollamaAPI.testConnection();
+      if (!isConnected) {
+        throw new Error('Keine Verbindung zu Ollama. Stellen Sie sicher, dass Ollama läuft.');
+      }
 
-${aiPrompt}
+      // Enhanced prompt for better AI mapping results
+      const mappingPrompt = `
+AUFGABE: Erstelle automatische Spalten-Mappings für CSV-Transformation
 
-Bitte erstelle automatische Mappings und Transformationen.
+QUELLDATEN-SPALTEN: ${sourceData.headers.join(', ')}
+ZIEL-TEMPLATE-SPALTEN: ${selectedTemplate.columns?.map(c => c.name).join(', ')}
+
+BENUTZER-ANWEISUNG: ${aiPrompt}
+
+Erstelle eine JSON-Antwort im folgenden Format:
+{
+  "mappings": [
+    {
+      "templateColumn": "Ziel-Spaltenname",
+      "sourceColumn": "Quell-Spaltenname oder leer",
+      "transformation": "direct|uppercase|lowercase|trim|format_phone",
+      "defaultValue": "Standard-Wert falls keine Quelle",
+      "confidence": 0-100
+    }
+  ],
+  "explanation": "Erklärung der Mappings"
+}
+
+Wichtig: Verwende nur existierende Spaltennamen. Bei unsicheren Mappings setze confidence < 80.
       `;
 
-      const result = await ollamaAPI.processDataTransformation(
-        sourceData.data.slice(0, 5),
-        `Basierend auf diesen Quelldaten-Spalten: ${sourceData.headers.join(', ')}
-Und diesen Ziel-Template-Spalten: ${selectedTemplate.columns?.map(c => c.name).join(', ')}
-
-${aiPrompt}
-
-Bitte erstelle automatische Mappings und Transformationen.`,
-        sourceData.headers
-      );
+      const result = await ollamaAPI.generateCompletion(mappingPrompt);
       
-      // Here you would parse the AI result and update mappings
-      // For now, we'll show a success message
-      toast({
-        title: "KI-Mapping erstellt",
-        description: "Die KI hat automatische Feldmappings vorgeschlagen"
-      });
+      // Parse AI response and extract mappings
+      try {
+        const jsonMatch = result.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const aiResult = JSON.parse(jsonMatch[0]);
+          
+          if (aiResult.mappings && Array.isArray(aiResult.mappings)) {
+            // Update mappings based on AI suggestions
+            const newMappings = mappings.map((currentMapping, index) => {
+              const aiMapping = aiResult.mappings.find(
+                (m: any) => m.templateColumn === currentMapping.templateColumn
+              );
+              
+              if (aiMapping && aiMapping.confidence > 70) {
+                return {
+                  ...currentMapping,
+                  sourceColumn: aiMapping.sourceColumn || currentMapping.sourceColumn,
+                  transformation: aiMapping.transformation || currentMapping.transformation,
+                  defaultValue: aiMapping.defaultValue || currentMapping.defaultValue
+                };
+              }
+              
+              return currentMapping;
+            });
+            
+            setMappings(newMappings);
+            
+            toast({
+              title: "KI-Mapping angewendet",
+              description: aiResult.explanation || "Automatische Feldmappings wurden erstellt"
+            });
+          } else {
+            throw new Error('Keine Mappings in AI-Antwort gefunden');
+          }
+        } else {
+          throw new Error('AI-Antwort ist kein gültiges JSON');
+        }
+      } catch (parseError) {
+        console.error('Failed to parse AI response:', parseError);
+        toast({
+          title: "KI-Mapping teilweise erfolgreich",
+          description: "AI-Antwort erhalten, aber Mappings konnten nicht automatisch angewendet werden. Versuchen Sie es mit einer präziseren Beschreibung.",
+          variant: "default"
+        });
+      }
 
     } catch (error) {
+      console.error('AI mapping error:', error);
       toast({
         title: "KI-Mapping fehlgeschlagen",
-        description: error instanceof Error ? error.message : "Unbekannter Fehler",
+        description: error instanceof Error ? error.message : "Unbekannter Fehler. Überprüfen Sie die Ollama-Verbindung.",
         variant: "destructive"
       });
     } finally {

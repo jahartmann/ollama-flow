@@ -259,19 +259,34 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
   }, [toast]);
 
   // Export handler
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback((filename?: string) => {
     const dataToExport = processedData || (files.length > 0 ? files[0] : null);
     if (!dataToExport) return;
 
+    // Apply template format if available
+    let finalData = dataToExport.data;
+    let finalHeaders = dataToExport.headers;
+
+    // If we have a template and mappings, transform the data to match template structure
+    if (selectedTemplate && columnMappings.length > 0) {
+      finalHeaders = columnMappings.map(mapping => mapping.templateColumn);
+      finalData = dataToExport.data.map(row => {
+        return columnMappings.map(mapping => {
+          if (mapping.sourceColumn) {
+            const sourceIndex = dataToExport.headers.indexOf(mapping.sourceColumn);
+            return sourceIndex !== -1 ? row[sourceIndex] || '' : mapping.defaultValue || '';
+          }
+          return mapping.defaultValue || '';
+        });
+      });
+    }
+
     try {
-      fileProcessor.exportAsCSV(
-        dataToExport.data,
-        dataToExport.headers,
-        `processed_${dataToExport.name}`
-      );
+      const exportName = filename ? `${filename}.csv` : `processed_${dataToExport.name}`;
+      fileProcessor.exportAsCSV(finalData, finalHeaders, exportName);
       toast({
         title: "Export erfolgreich",
-        description: "CSV-Datei wurde heruntergeladen"
+        description: `CSV-Datei "${exportName}" wurde heruntergeladen`
       });
     } catch (error) {
       toast({
@@ -280,7 +295,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
         variant: "destructive"
       });
     }
-  }, [processedData, files, toast]);
+  }, [processedData, files, selectedTemplate, columnMappings, toast]);
 
   // Navigation helpers
   const markStepCompleted = useCallback((stepIndex: number) => {

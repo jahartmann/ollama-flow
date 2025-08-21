@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Download, CheckCircle2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Eye, Download, CheckCircle2, FileText } from 'lucide-react';
 import LivePreview from '../../LivePreview';
 import { CSVFile, CSVTemplate } from '@/lib/transformationEngine';
 
@@ -10,7 +12,7 @@ interface PreviewStepProps {
   originalFiles: CSVFile[];
   processedData: CSVFile | null;
   selectedTemplate: CSVTemplate | null;
-  onExport: () => void;
+  onExport: (filename?: string) => void;
   onBack: () => void;
   onFinish: () => void;
 }
@@ -24,6 +26,15 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   onFinish
 }) => {
   const finalData = processedData || (originalFiles.length > 0 ? originalFiles[0] : null);
+  const [exportFilename, setExportFilename] = useState(() => {
+    const templateName = selectedTemplate?.name || 'processed';
+    const baseName = finalData?.name?.replace('.csv', '') || 'data';
+    return `${templateName}_${baseName}`;
+  });
+
+  const handleExport = () => {
+    onExport(exportFilename);
+  };
 
   return (
     <div className="space-y-6">
@@ -95,15 +106,39 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
             </div>
           )}
 
+          {/* Export Options */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FileText className="w-4 h-4" />
+                Export-Einstellungen
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="export-filename" className="text-sm font-medium">
+                  Dateiname (ohne .csv Erweiterung)
+                </Label>
+                <Input
+                  id="export-filename"
+                  value={exportFilename}
+                  onChange={(e) => setExportFilename(e.target.value)}
+                  placeholder="Dateiname eingeben..."
+                  className="mt-1"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-4">
             <Button 
-              onClick={onExport}
+              onClick={handleExport}
               className="flex-1 sm:flex-none"
-              disabled={!finalData}
+              disabled={!finalData || !exportFilename.trim()}
             >
               <Download className="w-4 h-4 mr-2" />
-              CSV exportieren
+              CSV exportieren als "{exportFilename}.csv"
             </Button>
             
             <div className="flex gap-2 flex-1 sm:flex-none">
