@@ -48,33 +48,7 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
   const { toast } = useToast();
 
   const sourceData = processedData || (files.length > 0 ? files[0] : null);
-  const defaultTemplates = [
-    {
-      id: 'contact',
-      name: 'Kontaktliste',
-      description: 'Standard Kontaktformat mit Name, Email, Telefon',
-      columns: [
-        { name: 'Vorname', type: 'string' as const, required: true },
-        { name: 'Nachname', type: 'string' as const, required: true },
-        { name: 'Email', type: 'email' as const, required: true },
-        { name: 'Telefon', type: 'string' as const, required: false },
-        { name: 'Firma', type: 'string' as const, required: false }
-      ]
-    },
-    {
-      id: 'product',
-      name: 'Produktkatalog',
-      description: 'E-Commerce Produktformat',
-      columns: [
-        { name: 'SKU', type: 'string' as const, required: true },
-        { name: 'Produktname', type: 'string' as const, required: true },
-        { name: 'Beschreibung', type: 'string' as const, required: false },
-        { name: 'Preis', type: 'number' as const, required: true },
-        { name: 'Kategorie', type: 'string' as const, required: true },
-        { name: 'Lagerbestand', type: 'number' as const, required: false }
-      ]
-    }
-  ];
+  const defaultTemplates: CSVTemplate[] = [];
 
   const availableTemplates = [...defaultTemplates, ...customTemplates];
 
@@ -205,15 +179,10 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
   }, [sourceData, mappings, filters]);
 
   const handleTemplateSelect = (templateId: string) => {
-    console.log('Template selected:', templateId); // Debug log
-    
-    if (templateId === 'upload') {
-      setShowTemplateUpload(true);
-      return;
-    }
+    console.log('Template selected:', templateId);
     
     const template = availableTemplates.find(t => t.id === templateId);
-    console.log('Found template:', template); // Debug log
+    console.log('Found template:', template);
     
     if (template) {
       onTemplateSelect(template as any);
@@ -341,7 +310,10 @@ Bitte erstelle automatische Mappings und Transformationen.`,
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => setShowTemplateUpload(true)}
+                onClick={() => {
+                  console.log('Template upload button clicked');
+                  setShowTemplateUpload(true);
+                }}
               >
                 <Upload className="w-4 h-4 mr-2" />
                 Neues Template
@@ -349,26 +321,24 @@ Bitte erstelle automatische Mappings und Transformationen.`,
             </div>
             <Select onValueChange={handleTemplateSelect} value={selectedTemplate?.id || ""}>
               <SelectTrigger>
-                <SelectValue placeholder="Template wählen..." />
+                <SelectValue placeholder="Template wählen oder neues erstellen..." />
               </SelectTrigger>
               <SelectContent className="bg-popover border z-50">
-                <SelectItem value="upload">
-                  <div className="flex items-center gap-2">
-                    <Upload className="w-4 h-4" />
-                    <div>
-                      <div className="font-medium">Neues Template erstellen</div>
-                      <div className="text-sm text-muted-foreground">Template hochladen oder manuell erstellen</div>
-                    </div>
+                {availableTemplates.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">
+                    <p>Keine Templates verfügbar</p>
+                    <p className="text-xs">Erstellen Sie ein neues Template</p>
                   </div>
-                </SelectItem>
-                {availableTemplates.map(template => (
-                  <SelectItem key={template.id} value={template.id}>
-                    <div>
-                      <div className="font-medium">{template.name}</div>
-                      <div className="text-sm text-muted-foreground">{template.description}</div>
-                    </div>
-                  </SelectItem>
-                ))}
+                ) : (
+                  availableTemplates.map(template => (
+                    <SelectItem key={template.id} value={template.id}>
+                      <div>
+                        <div className="font-medium">{template.name}</div>
+                        <div className="text-sm text-muted-foreground">{template.description}</div>
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -645,6 +615,21 @@ Bitte erstelle automatische Mappings und Transformationen.`,
           Vorschau & Export
         </Button>
       </div>
+
+      {/* Template Upload Modal */}
+      {showTemplateUpload && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-background rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto border shadow-lg">
+            <TemplateUpload
+              onTemplateCreate={handleTemplateCreate}
+              onClose={() => {
+                console.log('Closing template upload');
+                setShowTemplateUpload(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
