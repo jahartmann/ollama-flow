@@ -84,7 +84,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
 
   const steps = getSteps();
 
-  // File upload handler
+  // File upload handler with automatic delimiter detection
   const handleFileUpload = useCallback(async (uploadedFiles: File[]) => {
     console.log('Files uploaded:', uploadedFiles);
     const processedFiles: CSVFile[] = [];
@@ -92,9 +92,27 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
     for (const file of uploadedFiles) {
       try {
         console.log(`Processing file: ${file.name}`);
-        const csvFile = await fileProcessor.processFile(file);
+        
+        // Auto-detect delimiter
+        const detectedDelimiter = await fileProcessor.detectDelimiter(file);
+        console.log(`Detected delimiter for ${file.name}:`, detectedDelimiter);
+        
+        // Process with detected delimiter
+        const csvFile = await fileProcessor.processFile(file, detectedDelimiter);
         console.log('Processed CSV file:', csvFile);
-        processedFiles.push(csvFile);
+        
+        // If only 1 column detected with semicolon data, try comma
+        if (csvFile.headers.length === 1 && csvFile.headers[0].includes(';')) {
+          console.log('Detected semicolon in single column, reprocessing with semicolon delimiter');
+          const reprocessedFile = await fileProcessor.processFile(file, ';');
+          processedFiles.push(reprocessedFile);
+        } else if (csvFile.headers.length === 1 && csvFile.headers[0].includes(',')) {
+          console.log('Detected comma in single column, reprocessing with comma delimiter');
+          const reprocessedFile = await fileProcessor.processFile(file, ',');
+          processedFiles.push(reprocessedFile);
+        } else {
+          processedFiles.push(csvFile);
+        }
       } catch (error) {
         console.error('File processing error:', error);
         toast({
@@ -113,7 +131,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
         description: `${processedFiles.length} Datei(en) erfolgreich verarbeitet`,
       });
     }
-  }, [toast]);
+  }, [toast, setFiles]);
 
   // Remove file handler
   const handleRemoveFile = useCallback((fileId: string) => {

@@ -429,7 +429,7 @@ Bitte erstelle automatische Mappings und Transformationen.`,
                         <SelectTrigger className="h-8">
                           <SelectValue placeholder="Wählen..." />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[200]">
                           <SelectItem value="none">-- Keine --</SelectItem>
                           {sourceData?.headers.map(header => (
                             <SelectItem key={header} value={header}>{header}</SelectItem>
@@ -447,7 +447,7 @@ Bitte erstelle automatische Mappings und Transformationen.`,
                         <SelectTrigger className="h-8">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[200]">
                           <SelectItem value="direct">Direkt</SelectItem>
                           <SelectItem value="uppercase">Großbuchstaben</SelectItem>
                           <SelectItem value="lowercase">Kleinbuchstaben</SelectItem>

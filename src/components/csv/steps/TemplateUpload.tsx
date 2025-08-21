@@ -177,7 +177,7 @@ const TemplateUpload: React.FC<TemplateUploadProps> = ({ onTemplateCreate, onClo
                       <SelectTrigger className="h-8">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-[200]">
                         <SelectItem value="string">Text</SelectItem>
                         <SelectItem value="number">Zahl</SelectItem>
                         <SelectItem value="email">E-Mail</SelectItem>

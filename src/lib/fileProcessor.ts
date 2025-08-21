@@ -92,27 +92,37 @@ class FileProcessor {
     });
   }
 
-  // Auto-detect delimiter with better logic
+  // Auto-detect delimiter with improved logic for semicolon detection
   detectDelimiter(file: File): Promise<string> {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const sample = (e.target?.result as string)?.slice(0, 2000) || '';
         
+        // Check for BOM and remove it
+        const cleanSample = sample.replace(/^\uFEFF/, '');
+        
         const delimiters = [';', ',', '\t', '|'];
-        let bestDelimiter = ',';
+        let bestDelimiter = ';'; // Default to semicolon for European CSVs
         let maxScore = 0;
 
         delimiters.forEach(delimiter => {
-          const lines = sample.split('\n').filter(line => line.trim()).slice(0, 5);
-          if (lines.length < 2) return;
+          const lines = cleanSample.split('\n').filter(line => line.trim()).slice(0, 5);
+          if (lines.length < 1) return;
           
           const columnCounts = lines.map(line => line.split(delimiter).length);
           const avgColumns = columnCounts.reduce((a, b) => a + b, 0) / columnCounts.length;
-          const consistency = 1 - (Math.max(...columnCounts) - Math.min(...columnCounts)) / Math.max(...columnCounts);
           
-          // Score based on number of columns and consistency
-          const score = avgColumns * consistency;
+          // Calculate consistency (how uniform the column counts are)
+          const maxCols = Math.max(...columnCounts);
+          const minCols = Math.min(...columnCounts);
+          const consistency = maxCols > 0 ? 1 - (maxCols - minCols) / maxCols : 0;
+          
+          // Bonus for semicolon (European standard)
+          const bonus = delimiter === ';' ? 1.2 : 1.0;
+          
+          // Score based on number of columns, consistency, and delimiter preference
+          const score = avgColumns * consistency * bonus;
           
           console.log(`Delimiter '${delimiter}': avg columns=${avgColumns}, consistency=${consistency}, score=${score}`);
           
@@ -125,7 +135,7 @@ class FileProcessor {
         console.log('Best detected delimiter:', bestDelimiter);
         resolve(bestDelimiter);
       };
-      reader.readAsText(file.slice(0, 2000));
+      reader.readAsText(file.slice(0, 2000), 'UTF-8');
     });
   }
 
