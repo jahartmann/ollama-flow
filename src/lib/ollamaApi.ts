@@ -52,26 +52,41 @@ class OllamaAPI {
     try {
       console.log('Testing Ollama connection to:', this.baseUrl);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
-      const response = await fetch(`${this.baseUrl}/api/version`, {
-        method: 'GET',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        signal: controller.signal,
-        mode: 'cors'
-      });
+      // Try multiple endpoints to detect Ollama
+      const endpoints = ['/api/version', '/api/tags', '/'];
+      let lastError = null;
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(`${this.baseUrl}${endpoint}`, {
+            method: 'GET',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            signal: controller.signal,
+            mode: 'cors'
+          });
+          
+          console.log(`Testing ${endpoint}:`, response.status, response.statusText);
+          
+          if (response.ok) {
+            const data = await response.text();
+            console.log(`Successful response from ${endpoint}:`, data);
+            clearTimeout(timeoutId);
+            return true;
+          }
+        } catch (error) {
+          lastError = error;
+          console.log(`Failed ${endpoint}:`, error);
+          continue;
+        }
+      }
       
       clearTimeout(timeoutId);
-      console.log('Ollama connection response:', response.status, response.statusText);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Ollama version:', data);
-        return true;
-      }
+      console.error('All endpoints failed. Last error:', lastError);
       return false;
     } catch (error) {
       console.error('Connection test failed:', error);

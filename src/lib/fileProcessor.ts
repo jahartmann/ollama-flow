@@ -1,118 +1,112 @@
-interface ParsedFile {
-  id: string;
-  name: string;
-  columns: string[];
+import Papa from 'papaparse';
+
+export interface CSVParseResult {
   data: string[][];
+  headers: string[];
+  errors: string[];
+  filename: string;
   rowCount: number;
-  size: number;
-  encoding: string;
-  delimiter: string;
-  hasHeader: boolean;
+  columnCount: number;
 }
 
-interface FileParseOptions {
-  encoding?: string;
+export interface ParseOptions {
   delimiter?: string;
-  hasHeader?: boolean;
+  encoding?: string;
+  hasHeaders?: boolean;
+  skipEmptyLines?: boolean;
 }
 
 class FileProcessor {
-  async parseCSVFile(file: File, options: FileParseOptions = {}): Promise<ParsedFile> {
-    const {
-      encoding = 'utf-8',
-      delimiter = ',',
-      hasHeader = true
-    } = options;
-
-    try {
-      const text = await this.readFileWithEncoding(file, encoding);
-      const lines = text.split('\n').filter(line => line.trim());
-      
-      if (lines.length === 0) {
-        throw new Error('Datei ist leer');
-      }
-
-      const data = lines.map(line => this.parseCSVLine(line, delimiter));
-      const columns = hasHeader ? data[0] : data[0].map((_, i) => `Spalte ${i + 1}`);
-      const dataRows = hasHeader ? data.slice(1) : data;
-
-      return {
-        id: `${Date.now()}-${Math.random()}`,
-        name: file.name,
-        columns,
-        data: dataRows,
-        rowCount: dataRows.length,
-        size: file.size,
-        encoding,
-        delimiter,
-        hasHeader
-      };
-    } catch (error) {
-      console.error('File parsing error:', error);
-      throw new Error(`Fehler beim Parsen der Datei: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
-    }
-  }
-
-  private async readFileWithEncoding(file: File, encoding: string): Promise<string> {
+  async parseCSV(file: File, options: ParseOptions = {}): Promise<CSVParseResult> {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('Fehler beim Lesen der Datei'));
-      
-      // Use TextDecoder for proper encoding support
-      if (encoding !== 'utf-8') {
-        reader.readAsArrayBuffer(file);
-        reader.onload = () => {
-          try {
-            const decoder = new TextDecoder(encoding);
-            const text = decoder.decode(reader.result as ArrayBuffer);
-            resolve(text);
-          } catch (error) {
-            reject(new Error(`Unsupported encoding: ${encoding}`));
+      const config: Papa.ParseConfig<string[]> = {
+        complete: (results) => {
+          console.log('CSV parsing completed:', results);
+          
+          const data = results.data as string[][];
+          const errors = results.errors.map(err => err.message);
+          
+          // Filter out empty rows
+          const filteredData = options.skipEmptyLines !== false 
+            ? data.filter(row => row.some(cell => cell && cell.trim() !== ''))
+            : data;
+            
+          // Extract headers if specified
+          let headers: string[] = [];
+          let rows: string[][] = filteredData;
+          
+          if (options.hasHeaders !== false && filteredData.length > 0) {
+            headers = filteredData[0];
+            rows = filteredData.slice(1);
+          } else {
+            // Generate column names like Excel: A, B, C, etc.
+            const columnCount = filteredData[0]?.length || 0;
+            headers = Array.from({ length: columnCount }, (_, i) => 
+              String.fromCharCode(65 + i) // A, B, C, D...
+            );
           }
-        };
-      } else {
-        reader.readAsText(file, encoding);
-      }
+
+          const result: CSVParseResult = {
+            data: rows,
+            headers,
+            errors,
+            filename: file.name,
+            rowCount: rows.length,
+            columnCount: headers.length
+          };
+
+          console.log('Parsed CSV result:', result);
+          resolve(result);
+        },
+        error: (error) => {
+          console.error('CSV parsing error:', error);
+          reject(new Error(`CSV parsing failed: ${error.message}`));
+        },
+        header: false,
+        delimiter: options.delimiter || '',
+        skipEmptyLines: options.skipEmptyLines !== false,
+        dynamicTyping: false // Keep everything as strings
+      };
+
+      Papa.parse(file, config);
     });
   }
 
-  private parseCSVLine(line: string, delimiter: string): string[] {
-    const result: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    let i = 0;
+  // Auto-detect delimiter
+  detectDelimiter(file: File): Promise<string> {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const sample = (e.target?.result as string)?.slice(0, 1000) || '';
+        
+        const delimiters = [',', ';', '\t', '|'];
+        let bestDelimiter = ',';
+        let maxColumns = 0;
 
-    while (i < line.length) {
-      const char = line[i];
-      
-      if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"';
-          i += 2;
-        } else {
-          inQuotes = !inQuotes;
-          i++;
-        }
-      } else if (char === delimiter && !inQuotes) {
-        result.push(current.trim());
-        current = '';
-        i++;
-      } else {
-        current += char;
-        i++;
-      }
-    }
-    
-    result.push(current.trim());
-    return result;
+        delimiters.forEach(delimiter => {
+          const lines = sample.split('\n').slice(0, 3);
+          const columnCounts = lines.map(line => line.split(delimiter).length);
+          const avgColumns = columnCounts.reduce((a, b) => a + b, 0) / columnCounts.length;
+          
+          if (avgColumns > maxColumns) {
+            maxColumns = avgColumns;
+            bestDelimiter = delimiter;
+          }
+        });
+
+        console.log('Detected delimiter:', bestDelimiter);
+        resolve(bestDelimiter);
+      };
+      reader.readAsText(file.slice(0, 1000));
+    });
   }
 
-  exportToCSV(data: string[][], columns: string[], filename: string = 'export.csv'): void {
-    const csvContent = [
-      columns.join(','),
-      ...data.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
+  // Export data as CSV
+  exportAsCSV(data: string[][], headers: string[], filename: string = 'exported_data.csv'): void {
+    const csvContent = Papa.unparse({
+      fields: headers,
+      data: data
+    });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -125,69 +119,31 @@ class FileProcessor {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
     }
   }
 
-  exportToJSON(data: string[][], columns: string[], filename: string = 'export.json'): void {
-    const jsonData = data.map(row => {
-      const obj: Record<string, string> = {};
-      columns.forEach((col, index) => {
-        obj[col] = row[index] || '';
-      });
-      return obj;
-    });
-
-    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { 
-      type: 'application/json;charset=utf-8;' 
-    });
-    
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }
-  }
-
-  validateData(data: string[][], columns: string[]): {
-    isValid: boolean;
-    errors: string[];
-    warnings: string[];
-  } {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-
-    // Check for empty data
-    if (data.length === 0) {
-      errors.push('Keine Datenzeilen gefunden');
-    }
-
-    // Check column consistency
-    data.forEach((row, index) => {
-      if (row.length !== columns.length) {
-        warnings.push(`Zeile ${index + 1}: Ungleiche Anzahl von Spalten (${row.length} statt ${columns.length})`);
-      }
-    });
-
-    // Check for completely empty rows
-    const emptyRows = data.filter(row => row.every(cell => !cell.trim())).length;
-    if (emptyRows > 0) {
-      warnings.push(`${emptyRows} leere Zeilen gefunden`);
-    }
-
+  // Get data statistics
+  getDataStatistics(data: string[][], headers: string[]) {
     return {
-      isValid: errors.length === 0,
-      errors,
-      warnings
+      totalRows: data.length,
+      totalColumns: headers.length,
+      emptyRows: data.filter(row => row.every(cell => !cell || !cell.trim())).length,
+      columnStats: headers.map((header, index) => {
+        const columnData = data.map(row => row[index] || '');
+        const nonEmpty = columnData.filter(cell => cell && cell.trim() !== '');
+        
+        return {
+          name: header,
+          totalValues: columnData.length,
+          nonEmptyValues: nonEmpty.length,
+          emptyValues: columnData.length - nonEmpty.length,
+          uniqueValues: new Set(nonEmpty).size,
+          sampleValues: [...new Set(nonEmpty)].slice(0, 5)
+        };
+      })
     };
   }
 }
 
 export const fileProcessor = new FileProcessor();
-export type { ParsedFile, FileParseOptions };
+export default fileProcessor;
