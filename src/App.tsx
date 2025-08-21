@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import CSVTransformer from "@/components/CSVTransformer";
-import OllamaSettings from "@/components/OllamaSettings";
+import Settings from "@/components/Settings";
 import UpdateNotification from "@/components/UpdateNotification";
 import { useUpdateChecker } from "@/hooks/useUpdateChecker";
 import NotFound from "./pages/NotFound";
@@ -26,7 +26,7 @@ const AppContent = () => {
       )}
       <Routes>
         <Route path="/" element={<CSVTransformer />} />
-        <Route path="/settings" element={<OllamaSettings />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
