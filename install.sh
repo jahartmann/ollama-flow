@@ -125,54 +125,78 @@ install_dependencies() {
 
 # Check Ollama installation
 check_ollama() {
-    print_info "Checking Ollama installation..."
+    print_info "Prüfe Ollama-Verfügbarkeit..."
+    
+    read -p "Möchten Sie Ollama lokal installieren und konfigurieren? (y/N): " -n 1 -r
+    echo
+    
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_info "Ollama-Installation übersprungen (externes Hosting)"
+        print_warning "Stellen Sie sicher, dass Ihr Ollama-Server erreichbar ist:"
+        print_info "- Standard: http://localhost:11434"
+        print_info "- Oder konfigurieren Sie die URL in den Einstellungen"
+        return 0
+    fi
+    
     if command -v ollama >/dev/null 2>&1; then
-        print_status "Ollama found"
+        print_status "Ollama gefunden"
         
         # Check if Ollama service is running
         if pgrep -x "ollama" > /dev/null; then
-            print_status "Ollama service is running"
+            print_status "Ollama-Service läuft bereits"
         else
-            print_warning "Ollama is installed but not running"
-            print_info "Starting Ollama service..."
+            print_warning "Ollama ist installiert aber läuft nicht"
+            print_info "Starte Ollama-Service..."
             if [ "$MACHINE" = "Linux" ]; then
                 ollama serve &
                 sleep 2
-                print_status "Ollama service started"
+                print_status "Ollama-Service gestartet"
             else
-                print_info "Please start Ollama manually: 'ollama serve'"
+                print_info "Bitte starten Sie Ollama manuell: 'ollama serve'"
             fi
         fi
         
         # Check available models
-        print_info "Checking available models..."
+        print_info "Prüfe verfügbare Modelle..."
         MODELS=$(ollama list 2>/dev/null | tail -n +2 | wc -l)
         if [ "$MODELS" -gt 0 ]; then
-            print_status "$MODELS Ollama model(s) available"
+            print_status "$MODELS Ollama-Modell(e) verfügbar"
             ollama list
         else
-            print_warning "No Ollama models found"
-            print_info "Downloading recommended model: llama3.2:latest"
-            ollama pull llama3.2:latest
-            print_status "Model downloaded successfully"
+            print_warning "Keine Ollama-Modelle gefunden"
+            read -p "Empfohlenes Modell herunterladen (llama3.2:latest)? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                print_info "Lade Modell herunter (dies kann einige Minuten dauern)..."
+                ollama pull llama3.2:latest
+                print_status "Modell erfolgreich heruntergeladen"
+            fi
         fi
     else
-        print_warning "Ollama not found"
-        print_info "Installing Ollama..."
-        
-        if [ "$MACHINE" = "Linux" ]; then
-            curl -fsSL https://ollama.ai/install.sh | sh
-            print_status "Ollama installed"
-            print_info "Starting Ollama service..."
-            ollama serve &
-            sleep 3
-            print_info "Downloading recommended model..."
-            ollama pull llama3.2:latest
-        elif [ "$MACHINE" = "Mac" ]; then
-            print_info "Please download Ollama from: https://ollama.ai/download"
-            print_info "After installation, run: ollama pull llama3.2:latest"
+        print_warning "Ollama nicht gefunden"
+        read -p "Ollama jetzt installieren? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Installiere Ollama..."
+            
+            if [ "$MACHINE" = "Linux" ]; then
+                curl -fsSL https://ollama.ai/install.sh | sh
+                print_status "Ollama installiert"
+                print_info "Starte Ollama-Service..."
+                ollama serve &
+                sleep 3
+                print_info "Lade empfohlenes Modell herunter..."
+                ollama pull llama3.2:latest
+                print_status "Ollama-Setup abgeschlossen"
+            elif [ "$MACHINE" = "Mac" ]; then
+                print_info "Bitte laden Sie Ollama herunter: https://ollama.ai/download"
+                print_info "Nach der Installation führen Sie aus: ollama pull llama3.2:latest"
+            else
+                print_info "Besuchen Sie https://ollama.ai/download für Installationsanweisungen"
+            fi
         else
-            print_info "Please visit https://ollama.ai/download for installation instructions"
+            print_info "Ollama-Installation übersprungen"
+            print_info "Sie können Ollama später installieren oder einen externen Server verwenden"
         fi
     fi
 }
@@ -205,11 +229,14 @@ EOF
 
 # Start development server
 start_server() {
-    print_info "🎉 Installation completed successfully!"
+    print_info "🎉 Installation erfolgreich abgeschlossen!"
     echo ""
-    echo "Next steps:"
-    echo "1. Make sure Ollama is running: ollama serve"
-    echo "2. Start the development server:"
+    echo "Nächste Schritte:"
+    echo "1. Ollama-Server konfigurieren (falls extern gehostet):"
+    echo "   - Öffnen Sie die Anwendung"
+    echo "   - Gehen Sie zu Einstellungen"
+    echo "   - Konfigurieren Sie die Ollama-Server-URL"
+    echo "2. Entwicklungsserver starten:"
     
     case $PACKAGE_MANAGER in
         "bun")
@@ -223,13 +250,18 @@ start_server() {
             ;;
     esac
     
-    echo "3. Open http://localhost:5173 in your browser"
+    echo "3. Anwendung öffnen: http://localhost:5173"
+    echo ""
+    echo "📋 Wichtige Dateien:"
+    echo "   - install.sh: Installations-Script"
+    echo "   - update.sh: Update-Script für Konsole"
+    echo "   - .env.local: Umgebungskonfiguration"
     echo ""
     
-    read -p "Would you like to start the development server now? (y/N): " -n 1 -r
+    read -p "Entwicklungsserver jetzt starten? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        print_info "Starting development server..."
+        print_info "Starte Entwicklungsserver..."
         case $PACKAGE_MANAGER in
             "bun")
                 bun run dev
