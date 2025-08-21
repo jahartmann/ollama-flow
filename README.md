@@ -1,4 +1,4 @@
-# 🚀 ETL Automation Expert
+# Ollama Flow - KI-gestützte ETL-Plattform
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
@@ -61,11 +61,12 @@ graph TB
 ### Automatische Installation
 
 ```bash
-# Repository klonen
-git clone https://github.com/yourusername/etl-automation-expert.git
-cd etl-automation-expert
+# Mit curl
+curl -fsSL https://raw.githubusercontent.com/jahartmann/ollama-flow/main/install.sh | bash
 
-# Installationsskript ausführen (empfohlen)
+# Oder manuell
+git clone https://github.com/jahartmann/ollama-flow.git
+cd ollama-flow
 chmod +x install.sh
 ./install.sh
 ```
@@ -81,8 +82,8 @@ Das Installationsskript führt automatisch folgende Schritte aus:
 
 ```bash
 # 1. Repository klonen
-git clone https://github.com/yourusername/etl-automation-expert.git
-cd etl-automation-expert
+git clone https://github.com/jahartmann/ollama-flow.git
+cd ollama-flow
 
 # 2. Abhängigkeiten installieren
 npm install
@@ -197,7 +198,7 @@ VITE_DEV_MODE=true
 ### Projektstruktur
 
 ```
-etl-automation-expert/
+ollama-flow/
 ├── src/
 │   ├── components/          # React-Komponenten
 │   │   ├── ui/             # Basis-UI-Komponenten (shadcn/ui)
@@ -235,7 +236,7 @@ npm run test:coverage # Coverage-Report erstellen
 ### Beitragen
 
 1. **Fork** das Repository
-2. **Clone** Ihren Fork: `git clone https://github.com/yourusername/etl-automation-expert.git`
+2. **Clone** Ihren Fork: `git clone https://github.com/yourusername/ollama-flow.git`
 3. **Branch** erstellen: `git checkout -b feature/amazing-feature`
 4. **Changes** committen: `git commit -m 'Add amazing feature'`
 5. **Push** zum Branch: `git push origin feature/amazing-feature`
@@ -300,7 +301,7 @@ journalctl -u ollama -f
 # Öffnen Sie die Browser-Entwicklertools (F12)
 
 # Workflow-Ausführungslogs
-ls ~/.etl-automation/logs/
+ls ~/.ollama-flow/logs/
 ```
 
 ## 📈 Roadmap
@@ -319,10 +320,9 @@ ls ~/.etl-automation/logs/
 
 ## 🤝 Community
 
-- **Discord**: [ETL Automation Community](https://discord.gg/etl-automation)
-- **GitHub Discussions**: [Diskussionen](https://github.com/yourusername/etl-automation-expert/discussions)
-- **Documentation**: [Vollständige Docs](https://etl-automation-docs.example.com)
-- **YouTube**: [Video-Tutorials](https://youtube.com/etl-automation-expert)
+- **GitHub Issues**: [Bug Reports & Feature Requests](https://github.com/jahartmann/ollama-flow/issues)
+- **GitHub Discussions**: [Diskussionen](https://github.com/jahartmann/ollama-flow/discussions)
+- **Documentation**: [Wiki](https://github.com/jahartmann/ollama-flow/wiki)
 
 ## 📄 Lizenz
 
@@ -341,6 +341,6 @@ Dieses Projekt ist unter der [MIT-Lizenz](LICENSE) lizenziert.
 
 **Erstellt mit ❤️ für die Data Engineering Community**
 
-[⭐ Stern geben](https://github.com/yourusername/etl-automation-expert) • [🐛 Bug melden](https://github.com/yourusername/etl-automation-expert/issues) • [💡 Feature vorschlagen](https://github.com/yourusername/etl-automation-expert/discussions)
+[⭐ Stern geben](https://github.com/jahartmann/ollama-flow) • [🐛 Bug melden](https://github.com/jahartmann/ollama-flow/issues) • [💡 Feature vorschlagen](https://github.com/jahartmann/ollama-flow/discussions)
 
 </div>
