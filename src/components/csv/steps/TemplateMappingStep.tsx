@@ -323,8 +323,18 @@ Bitte erstelle automatische Mappings und Transformationen.`,
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
-            <label className="text-sm font-medium mb-2 block">Ziel-Template auswählen</label>
-            <Select onValueChange={handleTemplateSelect}>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium">Ziel-Template auswählen</label>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowTemplateUpload(true)}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Neues Template
+              </Button>
+            </div>
+            <Select onValueChange={handleTemplateSelect} value={selectedTemplate?.id || ""}>
               <SelectTrigger>
                 <SelectValue placeholder="Template wählen..." />
               </SelectTrigger>
