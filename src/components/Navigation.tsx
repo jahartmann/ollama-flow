@@ -17,31 +17,13 @@ const Navigation = () => {
   const navigationItems = [
     {
       path: '/',
-      label: 'ETL Wizard',
+      label: 'CSV Transformer',
       icon: Zap,
-      description: 'Schritt-für-Schritt Datenverarbeitung'
-    },
-    {
-      path: '/preview',
-      label: 'Datenvorschau',
-      icon: Eye,
-      description: 'Import & Vorschau von Dateien'
-    },
-    {
-      path: '/workflows',
-      label: 'Workflow Hub',
-      icon: Workflow,
-      description: 'Gespeicherte Workflows verwalten'
-    },
-    {
-      path: '/editor',
-      label: 'Visueller Editor',
-      icon: Palette,
-      description: 'Drag-and-Drop Workflow-Editor'
+      description: 'Daten-Transformation mit Rezepten'
     },
     {
       path: '/settings',
-      label: 'Einstellungen',
+      label: 'Einstellungen', 
       icon: Settings,
       description: 'KI-Konfiguration & Updates'
     }
@@ -57,7 +39,7 @@ const Navigation = () => {
               <Database className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold bg-gradient-data bg-clip-text text-transparent">
-              ETL Platform
+              CSV Transformer
             </span>
           </Link>
 

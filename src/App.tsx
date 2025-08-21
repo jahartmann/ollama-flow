@@ -4,10 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navigation from "@/components/Navigation";
-import ETLWizard from "@/components/ETLWizard";
-import DataPreview from "@/components/DataPreview";
-import WorkflowHub from "@/components/WorkflowHub";
-import VisualWorkflowEditor from "@/components/VisualWorkflowEditor";
+import CSVTransformer from "@/components/CSVTransformer";
 import OllamaSettings from "@/components/OllamaSettings";
 import UpdateNotification from "@/components/UpdateNotification";
 import { useUpdateChecker } from "@/hooks/useUpdateChecker";
@@ -28,10 +25,7 @@ const AppContent = () => {
         />
       )}
       <Routes>
-        <Route path="/" element={<ETLWizard />} />
-        <Route path="/preview" element={<DataPreview />} />
-        <Route path="/workflows" element={<WorkflowHub />} />
-        <Route path="/editor" element={<VisualWorkflowEditor />} />
+        <Route path="/" element={<CSVTransformer />} />
         <Route path="/settings" element={<OllamaSettings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

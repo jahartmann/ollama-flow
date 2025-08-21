@@ -1,7 +1,7 @@
-import ETLWizard from "@/components/ETLWizard";
+import CSVTransformer from "@/components/CSVTransformer";
 
 const Index = () => {
-  return <ETLWizard />;
+  return <CSVTransformer />;
 };
 
 export default Index;
