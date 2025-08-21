@@ -164,7 +164,7 @@ const OllamaSettings = () => {
                     <SelectTrigger className="bg-background border-border">
                       <SelectValue placeholder="Modell auswählen" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-popover border-border shadow-lg z-50">
                       {availableModels.map((model) => (
                         <SelectItem key={model.name} value={model.name}>
                           {model.name}
@@ -198,31 +198,42 @@ const OllamaSettings = () => {
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-4 mt-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-sm text-foreground">Ollama Base URL</Label>
+                      <Label className="text-sm text-foreground">Server URL</Label>
                       <Input
-                        value={`${config.serverUrl}:${config.port}`}
-                        onChange={(e) => {
-                          const url = e.target.value;
-                          const [serverUrl, port] = url.split(':');
-                          handleConfigChange('serverUrl', serverUrl || 'http://localhost');
-                          handleConfigChange('port', port || '11434');
-                        }}
+                        value={config.serverUrl}
+                        onChange={(e) => handleConfigChange('serverUrl', e.target.value)}
+                        placeholder="http://localhost"
                         className="bg-background border-border"
                       />
                       <p className="text-xs text-muted-foreground mt-1">
-                        Enter the URL where Ollama is running.
+                        Enter the base URL where Ollama is running.
                       </p>
                     </div>
 
+                    <div>
+                      <Label className="text-sm text-foreground">Port</Label>
+                      <Input
+                        value={config.port}
+                        onChange={(e) => handleConfigChange('port', e.target.value)}
+                        placeholder="11434"
+                        className="bg-background border-border"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Enter the port number (usually 11434).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-sm text-foreground">Performance Mode</Label>
                       <Select defaultValue="Maximum">
                         <SelectTrigger className="bg-background border-border">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-popover border-border shadow-lg z-50">
                           <SelectItem value="Maximum">Maximum</SelectItem>
                           <SelectItem value="Balanced">Balanced</SelectItem>
                           <SelectItem value="Efficient">Efficient</SelectItem>
@@ -239,7 +250,7 @@ const OllamaSettings = () => {
                         <SelectTrigger className="bg-background border-border">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-popover border-border shadow-lg z-50">
                           <SelectItem value="Forever">Forever</SelectItem>
                           <SelectItem value="5m">5 Minutes</SelectItem>
                           <SelectItem value="10m">10 Minutes</SelectItem>
@@ -427,6 +438,16 @@ const OllamaSettings = () => {
                 <AlertCircle className="w-4 h-4" />
                 <AlertTitle>Update-Fehler</AlertTitle>
                 <AlertDescription>{updateError}</AlertDescription>
+              </Alert>
+            )}
+
+            {!updateInfo?.available && !updateError && !isChecking && (
+              <Alert>
+                <CheckCircle2 className="w-4 h-4" />
+                <AlertTitle>Auf dem neuesten Stand</AlertTitle>
+                <AlertDescription>
+                  Ihre Anwendung ist bereits auf der neuesten Version.
+                </AlertDescription>
               </Alert>
             )}
           </CardContent>
