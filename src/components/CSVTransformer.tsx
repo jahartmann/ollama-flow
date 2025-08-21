@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { UploadCloud, BookText, ListChecks, Columns, LayoutTemplate, Save, RefreshCw } from 'lucide-react';
 import FileUpload from './FileUpload';
 import { CSVFile, TransformationRecipe, TemplateColumnMapping, NewColumn, ColumnMapping, CSVTemplate } from '@/lib/transformationEngine';
+import { fileProcessor } from '@/lib/fileProcessor';
 import LivePreview from './LivePreview';
 import RecipeList from './RecipeList';
 import { useToast } from "@/hooks/use-toast"
@@ -21,10 +22,11 @@ interface CSVTransformerProps {
 }
 
 const CSVTransformer: React.FC<CSVTransformerProps> = ({
-  files = [],
+  files: initialFiles = [],
   onTransform,
   onRecipesChange
 }) => {
+  const [files, setFiles] = useState<CSVFile[]>(initialFiles);
   const [activeTab, setActiveTab] = useState('upload');
   const [recipeName, setRecipeName] = useState('');
   const [recipeDescription, setRecipeDescription] = useState('');
@@ -36,7 +38,45 @@ const CSVTransformer: React.FC<CSVTransformerProps> = ({
     newColumns: [],
     templateMappings: []
   });
-  const { toast } = useToast()
+  const { toast } = useToast();
+
+  // Handle file upload
+  const handleFileUpload = useCallback(async (uploadedFiles: File[]) => {
+    console.log('Files uploaded:', uploadedFiles);
+    const processedFiles: CSVFile[] = [];
+    
+    for (const file of uploadedFiles) {
+      try {
+        console.log(`Processing file: ${file.name}`);
+        const csvFile = await fileProcessor.processFile(file);
+        console.log('Processed CSV file:', csvFile);
+        processedFiles.push(csvFile);
+      } catch (error) {
+        console.error('File processing error:', error);
+        toast({
+          title: "Fehler beim Verarbeiten",
+          description: `Datei "${file.name}" konnte nicht verarbeitet werden: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`,
+          variant: "destructive"
+        });
+      }
+    }
+    
+    if (processedFiles.length > 0) {
+      console.log('Adding processed files to state:', processedFiles);
+      setFiles(prev => {
+        const updated = [...prev, ...processedFiles];
+        console.log('Updated files state:', updated);
+        return updated;
+      });
+      toast({
+        title: "Dateien hochgeladen",
+        description: `${processedFiles.length} Datei(en) erfolgreich verarbeitet`,
+      });
+      
+      // Auto-switch to upload tab to show the uploaded files
+      setActiveTab('upload');
+    }
+  }, [toast]);
 
   // Generate smart mapping suggestions based on source files
   const getColumnSuggestions = (targetColumn: string): string[] => {
@@ -211,7 +251,7 @@ const CSVTransformer: React.FC<CSVTransformerProps> = ({
 
   return (
     <div className="space-y-6">
-      <FileUpload />
+      <FileUpload onFileUpload={handleFileUpload} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
@@ -242,7 +282,50 @@ const CSVTransformer: React.FC<CSVTransformerProps> = ({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p>Drag & Drop oder klicke zum Hochladen</p>
+              {files.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  Keine Dateien hochgeladen. Verwenden Sie den Bereich oben zum Hochladen.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Hochgeladene Dateien ({files.length})</h3>
+                  <div className="grid gap-4">
+                    {files.map((file) => (
+                      <Card key={file.id} className="border border-primary/20">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <h4 className="font-medium">{file.name}</h4>
+                              <p className="text-sm text-muted-foreground">
+                                {file.data.length} Zeilen, {file.headers.length} Spalten
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {file.headers.slice(0, 5).map((header, index) => (
+                                  <Badge key={index} variant="secondary" className="text-xs">
+                                    {header}
+                                  </Badge>
+                                ))}
+                                {file.headers.length > 5 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{file.headers.length - 5} weitere
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onTransform(file)}
+                            >
+                              Verarbeiten
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

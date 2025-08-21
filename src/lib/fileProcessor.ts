@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { CSVFile } from './transformationEngine';
 
 export interface CSVParseResult {
   data: string[][];
@@ -17,6 +18,18 @@ export interface ParseOptions {
 }
 
 class FileProcessor {
+  // Convert File to CSVFile format
+  async processFile(file: File): Promise<CSVFile> {
+    const parseResult = await this.parseCSV(file);
+    
+    return {
+      id: `csv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: parseResult.filename,
+      headers: parseResult.headers,
+      data: parseResult.data
+    };
+  }
+
   async parseCSV(file: File, options: ParseOptions = {}): Promise<CSVParseResult> {
     return new Promise((resolve, reject) => {
       Papa.parse(file, {
