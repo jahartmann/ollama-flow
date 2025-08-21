@@ -18,15 +18,23 @@ export interface ParseOptions {
 }
 
 class FileProcessor {
-  // Convert File to CSVFile format
-  async processFile(file: File): Promise<CSVFile> {
-    const parseResult = await this.parseCSV(file);
+  // Convert File to CSVFile format with delimiter detection
+  async processFile(file: File, delimiter?: string): Promise<CSVFile> {
+    // Auto-detect delimiter if not provided
+    const detectedDelimiter = delimiter || await this.detectDelimiter(file);
+    
+    const parseResult = await this.parseCSV(file, { 
+      delimiter: detectedDelimiter,
+      hasHeaders: true,
+      skipEmptyLines: true 
+    });
     
     return {
       id: `csv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: parseResult.filename,
       headers: parseResult.headers,
-      data: parseResult.data
+      data: parseResult.data,
+      delimiter: detectedDelimiter // Store delimiter for later use
     };
   }
 
@@ -84,40 +92,50 @@ class FileProcessor {
     });
   }
 
-  // Auto-detect delimiter
+  // Auto-detect delimiter with better logic
   detectDelimiter(file: File): Promise<string> {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const sample = (e.target?.result as string)?.slice(0, 1000) || '';
+        const sample = (e.target?.result as string)?.slice(0, 2000) || '';
         
-        const delimiters = [',', ';', '\t', '|'];
+        const delimiters = [';', ',', '\t', '|'];
         let bestDelimiter = ',';
-        let maxColumns = 0;
+        let maxScore = 0;
 
         delimiters.forEach(delimiter => {
-          const lines = sample.split('\n').slice(0, 3);
+          const lines = sample.split('\n').filter(line => line.trim()).slice(0, 5);
+          if (lines.length < 2) return;
+          
           const columnCounts = lines.map(line => line.split(delimiter).length);
           const avgColumns = columnCounts.reduce((a, b) => a + b, 0) / columnCounts.length;
+          const consistency = 1 - (Math.max(...columnCounts) - Math.min(...columnCounts)) / Math.max(...columnCounts);
           
-          if (avgColumns > maxColumns) {
-            maxColumns = avgColumns;
+          // Score based on number of columns and consistency
+          const score = avgColumns * consistency;
+          
+          console.log(`Delimiter '${delimiter}': avg columns=${avgColumns}, consistency=${consistency}, score=${score}`);
+          
+          if (score > maxScore && avgColumns > 1) {
+            maxScore = score;
             bestDelimiter = delimiter;
           }
         });
 
-        console.log('Detected delimiter:', bestDelimiter);
+        console.log('Best detected delimiter:', bestDelimiter);
         resolve(bestDelimiter);
       };
-      reader.readAsText(file.slice(0, 1000));
+      reader.readAsText(file.slice(0, 2000));
     });
   }
 
-  // Export data as CSV
-  exportAsCSV(data: string[][], headers: string[], filename: string = 'exported_data.csv'): void {
+  // Export data as CSV with customizable delimiter
+  exportAsCSV(data: string[][], headers: string[], filename: string = 'exported_data.csv', delimiter: string = ','): void {
     const csvContent = Papa.unparse({
       fields: headers,
       data: data
+    }, {
+      delimiter: delimiter
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

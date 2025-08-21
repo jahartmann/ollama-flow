@@ -4,6 +4,7 @@ export interface CSVFile {
   name: string;
   headers: string[];
   data: string[][];
+  delimiter?: string;
 }
 
 export interface ColumnMapping {
