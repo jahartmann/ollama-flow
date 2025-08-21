@@ -5,162 +5,176 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
   Upload,
-  Eye,
   FileText,
+  BarChart3,
+  Download,
+  Zap,
   AlertCircle,
   CheckCircle2,
-  Settings,
   RefreshCw,
-  Brain
+  Eye,
+  Settings
 } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { fileProcessor, type ParsedFile } from '@/lib/fileProcessor';
-import { ollamaAPI } from '@/lib/ollamaApi';
-
-interface FileUpload extends ParsedFile {
-  file: File;
-  status: 'uploaded' | 'parsing' | 'ready' | 'error';
-  errorMessage?: string;
-  previewData: string[][];
-}
+import { fileProcessor, type CSVParseResult, type ParseOptions } from '@/lib/fileProcessor';
+import { templateEngine, type DataTemplate, type CSVData } from '@/lib/templateEngine';
+import { useToast } from '@/hooks/use-toast';
 
 const DataPreview = () => {
-  const [uploadedFiles, setUploadedFiles] = useState<FileUpload[]>([]);
-  const [activeFileId, setActiveFileId] = useState<string | null>(null);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [isProcessingAi, setIsProcessingAi] = useState(false);
+  const [csvData, setCsvData] = useState<CSVParseResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [parseOptions, setParseOptions] = useState<ParseOptions>({
+    delimiter: '',
+    hasHeaders: true,
+    skipEmptyLines: true
+  });
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [selectedColumn, setSelectedColumn] = useState<string>('');
+  const [templateParameters, setTemplateParameters] = useState<Record<string, string>>({});
+  const [isApplyingTemplate, setIsApplyingTemplate] = useState(false);
+  const { toast } = useToast();
 
-  const encodingOptions = [
-    { value: 'utf-8', label: 'UTF-8' },
-    { value: 'iso-8859-1', label: 'ISO-8859-1 (Latin-1)' },
-    { value: 'windows-1252', label: 'Windows-1252' },
-    { value: 'utf-16', label: 'UTF-16' }
-  ];
+  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  const delimiterOptions = [
-    { value: ',', label: 'Komma (,)' },
-    { value: ';', label: 'Semikolon (;)' },
-    { value: '\t', label: 'Tab (\\t)' },
-    { value: '|', label: 'Pipe (|)' }
-  ];
-
-  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
+    setIsLoading(true);
     
-    files.forEach(file => {
-      const fileUpload: FileUpload = {
-        id: Date.now().toString() + Math.random(),
-        file,
-        name: file.name,
-        columns: [],
-        data: [],
-        rowCount: 0,
-        size: file.size,
-        encoding: 'utf-8',
-        delimiter: ',',
-        hasHeader: true,
-        previewData: [],
-        status: 'uploaded'
-      };
-      
-      setUploadedFiles(prev => [...prev, fileUpload]);
-      parseFile(fileUpload);
-    });
-  }, []);
-
-  const parseFile = async (fileUpload: FileUpload) => {
-    setUploadedFiles(prev => 
-      prev.map(f => f.id === fileUpload.id ? { ...f, status: 'parsing' } : f)
-    );
-
     try {
-      const parsedFile = await fileProcessor.parseCSVFile(fileUpload.file, {
-        encoding: fileUpload.encoding,
-        delimiter: fileUpload.delimiter,
-        hasHeader: fileUpload.hasHeader
+      // Auto-detect delimiter if not specified
+      if (!parseOptions.delimiter) {
+        const detectedDelimiter = await fileProcessor.detectDelimiter(file);
+        setParseOptions(prev => ({ ...prev, delimiter: detectedDelimiter }));
+      }
+
+      const result = await fileProcessor.parseCSV(file, parseOptions);
+      setCsvData(result);
+      
+      toast({
+        title: "CSV erfolgreich geladen",
+        description: `${result.rowCount} Zeilen und ${result.columnCount} Spalten importiert`,
       });
 
-      const previewData = parsedFile.data.slice(0, 5); // Show first 5 rows
-      
-      setUploadedFiles(prev => 
-        prev.map(f => f.id === fileUpload.id ? {
-          ...f,
-          ...parsedFile,
-          previewData,
-          status: 'ready'
-        } : f)
-      );
-      
-      if (!activeFileId) {
-        setActiveFileId(fileUpload.id);
+      if (result.errors.length > 0) {
+        toast({
+          title: "Warnungen beim Import",
+          description: result.errors.slice(0, 3).join(', '),
+          variant: "destructive"
+        });
       }
     } catch (error) {
-      setUploadedFiles(prev => 
-        prev.map(f => f.id === fileUpload.id ? {
-          ...f,
-          status: 'error',
-          errorMessage: error instanceof Error ? error.message : 'Unbekannter Fehler'
-        } : f)
-      );
+      console.error('CSV import error:', error);
+      toast({
+        title: "Import-Fehler",
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [parseOptions, toast]);
 
-  const updateFileSettings = (fileId: string, updates: Partial<FileUpload>) => {
-    setUploadedFiles(prev => {
-      const updated = prev.map(f => f.id === fileId ? { ...f, ...updates } : f);
-      const fileToReparse = updated.find(f => f.id === fileId);
-      if (fileToReparse) {
-        parseFile(fileToReparse);
-      }
-      return updated;
-    });
-  };
+  const applyTemplate = useCallback(async () => {
+    if (!csvData || !selectedTemplate || !selectedColumn) return;
 
-  const handleAiProcess = async () => {
-    if (!aiPrompt.trim() || !activeFileId) return;
-    
-    const activeFile = uploadedFiles.find(f => f.id === activeFileId);
-    if (!activeFile) return;
-
-    setIsProcessingAi(true);
+    setIsApplyingTemplate(true);
     
     try {
-      const result = await ollamaAPI.processDataTransformation(
-        [activeFile.columns, ...activeFile.previewData],
-        aiPrompt
+      const csvDataForTemplate: CSVData = {
+        headers: csvData.headers,
+        rows: csvData.data,
+        filename: csvData.filename
+      };
+
+      const result = templateEngine.applyTemplate(
+        csvDataForTemplate,
+        selectedTemplate,
+        selectedColumn,
+        templateParameters
       );
 
-      // Update the file with transformed data
-      setUploadedFiles(prev => 
-        prev.map(f => f.id === activeFileId ? {
-          ...f,
-          data: result.transformedData,
-          previewData: result.transformedData.slice(0, 5)
-        } : f)
-      );
-
-      // Show explanation in console for now
-      console.log('AI Transformation Result:', result.explanation);
+      if (result.success) {
+        setCsvData(prev => prev ? {
+          ...prev,
+          data: result.data
+        } : null);
+        
+        toast({
+          title: "Vorlage angewendet",
+          description: result.message
+        });
+      } else {
+        toast({
+          title: "Fehler beim Anwenden der Vorlage",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
     } catch (error) {
-      console.error('AI processing failed:', error);
+      console.error('Template application error:', error);
+      toast({
+        title: "Unerwarteter Fehler",
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+        variant: "destructive"
+      });
     } finally {
-      setIsProcessingAi(false);
+      setIsApplyingTemplate(false);
     }
-  };
+  }, [csvData, selectedTemplate, selectedColumn, templateParameters, toast]);
 
-  const activeFile = uploadedFiles.find(f => f.id === activeFileId);
+  const exportData = useCallback((format: 'csv' | 'json') => {
+    if (!csvData) return;
+
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `${csvData.filename.replace('.csv', '')}_processed_${timestamp}`;
+
+    if (format === 'csv') {
+      fileProcessor.exportAsCSV(csvData.data, csvData.headers, `${filename}.csv`);
+    } else {
+      // Export as JSON
+      const jsonData = csvData.data.map(row => {
+        const obj: Record<string, string> = {};
+        csvData.headers.forEach((header, index) => {
+          obj[header] = row[index] || '';
+        });
+        return obj;
+      });
+
+      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { 
+        type: 'application/json;charset=utf-8;' 
+      });
+      
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${filename}.json`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    toast({
+      title: "Export erfolgreich",
+      description: `Datei als ${format.toUpperCase()} exportiert`
+    });
+  }, [csvData, toast]);
+
+  const templates = templateEngine.getTemplates();
+  const selectedTemplateData = templates.find(t => t.id === selectedTemplate);
+  const statistics = csvData ? fileProcessor.getDataStatistics(csvData.data, csvData.headers) : null;
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       <div className="text-center space-y-4">
         <h1 className="text-4xl font-bold bg-gradient-data bg-clip-text text-transparent">
-          Datenvorschau & Import
+          Daten-Vorschau & Bearbeitung
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Importieren Sie Ihre Dateien und überprüfen Sie die Datenstruktur vor der Verarbeitung
+          Importieren Sie CSV-Dateien und wenden Sie einfache Vorlagen wie Excel-Formeln an
         </p>
       </div>
 
@@ -169,159 +183,131 @@ const DataPreview = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="w-5 h-5" />
-            Datei-Upload
+            CSV-Datei importieren
           </CardTitle>
           <CardDescription>
-            Wählen Sie eine oder mehrere CSV-Dateien für den Import aus
+            Laden Sie eine CSV-Datei hoch und konfigurieren Sie die Import-Optionen
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-smooth">
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label>Trennzeichen</Label>
+              <Select 
+                value={parseOptions.delimiter} 
+                onValueChange={(value) => setParseOptions(prev => ({...prev, delimiter: value}))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Auto-detect" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border shadow-lg z-50">
+                  <SelectItem value="">Auto-detect</SelectItem>
+                  <SelectItem value=",">Komma (,)</SelectItem>
+                  <SelectItem value=";">Semikolon (;)</SelectItem>
+                  <SelectItem value="\t">Tab (\t)</SelectItem>
+                  <SelectItem value="|">Pipe (|)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center space-x-2 pt-6">
+              <input
+                type="checkbox"
+                id="hasHeaders"
+                checked={parseOptions.hasHeaders}
+                onChange={(e) => setParseOptions(prev => ({...prev, hasHeaders: e.target.checked}))}
+              />
+              <Label htmlFor="hasHeaders">Erste Zeile als Überschrift</Label>
+            </div>
+
+            <div className="flex items-center space-x-2 pt-6">
+              <input
+                type="checkbox"
+                id="skipEmpty"
+                checked={parseOptions.skipEmptyLines}
+                onChange={(e) => setParseOptions(prev => ({...prev, skipEmptyLines: e.target.checked}))}
+              />
+              <Label htmlFor="skipEmpty">Leere Zeilen überspringen</Label>
+            </div>
+          </div>
+
+          <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
             <input
               type="file"
-              multiple
-              accept=".csv,.txt"
+              accept=".csv,.tsv"
               onChange={handleFileUpload}
+              disabled={isLoading}
               className="hidden"
-              id="file-upload"
+              id="csv-upload"
             />
-            <label htmlFor="file-upload" className="cursor-pointer">
-              <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-lg font-medium">Dateien hier ablegen oder klicken</p>
-              <p className="text-sm text-muted-foreground">CSV, TXT-Dateien werden unterstützt</p>
-            </label>
+            <Label htmlFor="csv-upload" className="cursor-pointer">
+              <div className="space-y-2">
+                <FileText className="w-12 h-12 mx-auto text-muted-foreground" />
+                <p className="text-lg font-medium">
+                  {isLoading ? 'Datei wird verarbeitet...' : 'CSV-Datei hier ablegen oder klicken'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Unterstützte Formate: .csv, .tsv (max. 50MB)
+                </p>
+              </div>
+            </Label>
           </div>
         </CardContent>
       </Card>
 
-      {/* File Tabs */}
-      {uploadedFiles.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {uploadedFiles.map((file) => (
-            <Button
-              key={file.id}
-              variant={activeFileId === file.id ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveFileId(file.id)}
-              className="flex items-center gap-2"
-            >
-              <FileText className="w-4 h-4" />
-              {file.file.name}
-              {file.status === 'ready' && <CheckCircle2 className="w-3 h-3 text-success" />}
-              {file.status === 'parsing' && <RefreshCw className="w-3 h-3 animate-spin" />}
-              {file.status === 'error' && <AlertCircle className="w-3 h-3 text-destructive" />}
-            </Button>
-          ))}
-        </div>
-      )}
+      {csvData && (
+        <Tabs defaultValue="preview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="preview" className="flex items-center gap-2">
+              <Eye className="w-4 h-4" />
+              Vorschau
+            </TabsTrigger>
+            <TabsTrigger value="templates" className="flex items-center gap-2">
+              <Zap className="w-4 h-4" />
+              Vorlagen
+            </TabsTrigger>
+            <TabsTrigger value="statistics" className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Statistiken
+            </TabsTrigger>
+            <TabsTrigger value="export" className="flex items-center gap-2">
+              <Download className="w-4 h-4" />
+              Export
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Active File Configuration */}
-      {activeFile && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Settings Panel */}
-          <Card className="shadow-elegant">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                Parse-Einstellungen
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Zeichenkodierung</Label>
-                <Select
-                  value={activeFile.encoding}
-                  onValueChange={(value) => updateFileSettings(activeFile.id, { encoding: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {encodingOptions.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Trennzeichen</Label>
-                <Select
-                  value={activeFile.delimiter}
-                  onValueChange={(value) => updateFileSettings(activeFile.id, { delimiter: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {delimiterOptions.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="has-header"
-                  checked={activeFile.hasHeader}
-                  onChange={(e) => updateFileSettings(activeFile.id, { hasHeader: e.target.checked })}
-                  className="w-4 h-4"
-                />
-                <Label htmlFor="has-header">Erste Zeile enthält Spaltennamen</Label>
-              </div>
-
-              <div className="pt-4">
-                <Badge variant="outline" className="mb-2">
-                  {activeFile.columns.length} Spalten erkannt
-                </Badge>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  {activeFile.columns.slice(0, 5).map((col, i) => (
-                    <div key={i}>• {col}</div>
-                  ))}
-                  {activeFile.columns.length > 5 && (
-                    <div>... und {activeFile.columns.length - 5} weitere</div>
+          {/* Data Preview */}
+          <TabsContent value="preview">
+            <Card>
+              <CardHeader>
+                <CardTitle>Daten-Vorschau</CardTitle>
+                <CardDescription>
+                  {csvData.rowCount} Zeilen, {csvData.columnCount} Spalten
+                  {csvData.errors.length > 0 && (
+                    <Badge variant="destructive" className="ml-2">
+                      {csvData.errors.length} Fehler
+                    </Badge>
                   )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Preview Panel */}
-          <Card className="lg:col-span-2 shadow-elegant">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Eye className="w-5 h-5" />
-                Datenvorschau
-              </CardTitle>
-              <CardDescription>
-                Erste 5 Zeilen von {activeFile.file.name}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {activeFile.status === 'ready' ? (
-                <div className="overflow-x-auto">
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-auto max-h-96 border rounded">
                   <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        {activeFile.columns.map((col, i) => (
-                          <th key={i} className="text-left p-2 font-medium text-muted-foreground">
-                            {col}
+                    <thead className="bg-muted sticky top-0">
+                      <tr>
+                        {csvData.headers.map((header, index) => (
+                          <th key={index} className="p-2 text-left font-medium border-r">
+                            {header}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {activeFile.previewData.map((row, i) => (
-                        <tr key={i} className="border-b hover:bg-muted/50">
-                          {row.map((cell, j) => (
-                            <td key={j} className="p-2">
-                              {cell}
+                      {csvData.data.slice(0, 50).map((row, rowIndex) => (
+                        <tr key={rowIndex} className="border-b hover:bg-muted/50">
+                          {row.map((cell, cellIndex) => (
+                            <td key={cellIndex} className="p-2 border-r">
+                              {cell || '-'}
                             </td>
                           ))}
                         </tr>
@@ -329,65 +315,210 @@ const DataPreview = () => {
                     </tbody>
                   </table>
                 </div>
-              ) : activeFile.status === 'error' ? (
-                <Alert variant="destructive">
-                  <AlertCircle className="w-4 h-4" />
-                  <AlertTitle>Parsing-Fehler</AlertTitle>
-                  <AlertDescription>
-                    {activeFile.errorMessage}
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-                  Datei wird verarbeitet...
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* AI-Assisted Processing */}
-      {activeFile?.status === 'ready' && (
-        <Card className="shadow-elegant">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Brain className="w-5 h-5" />
-              KI-gestützte Datenbearbeitung
-            </CardTitle>
-            <CardDescription>
-              Beschreiben Sie, welche Transformationen oder Analysen durchgeführt werden sollen
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              placeholder="z.B. 'Teile die Spalte Adresse in Straße, PLZ und Ort auf' oder 'Fasse Vor- und Nachname zu einem Vollnamen zusammen'"
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-              rows={3}
-            />
-            <div className="flex gap-4">
-              <Button
-                onClick={handleAiProcess}
-                disabled={!aiPrompt.trim() || isProcessingAi}
-                className="bg-gradient-primary"
-              >
-                {isProcessingAi ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Verarbeitung läuft...
-                  </>
-                ) : (
-                  <>
-                    <Brain className="w-4 h-4 mr-2" />
-                    KI-Transformation starten
-                  </>
+                {csvData.data.length > 50 && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Zeige erste 50 von {csvData.rowCount} Zeilen
+                  </p>
                 )}
-              </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Templates */}
+          <TabsContent value="templates">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Vorlage auswählen</CardTitle>
+                  <CardDescription>
+                    Wählen Sie eine Vorlage und Spalte für die Transformation
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Vorlage</Label>
+                    <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Vorlage auswählen" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover border-border shadow-lg z-50">
+                        {templates.map((template) => (
+                          <SelectItem key={template.id} value={template.id}>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{template.category}</Badge>
+                              {template.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Zielspalte</Label>
+                    <Select value={selectedColumn} onValueChange={setSelectedColumn}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Spalte auswählen" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover border-border shadow-lg z-50">
+                        {csvData.headers.map((header) => (
+                          <SelectItem key={header} value={header}>
+                            {header}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedTemplateData?.parameters?.map((param) => (
+                    <div key={param}>
+                      <Label>{param}</Label>
+                      <Input
+                        value={templateParameters[param] || ''}
+                        onChange={(e) => setTemplateParameters(prev => ({
+                          ...prev,
+                          [param]: e.target.value
+                        }))}
+                        placeholder={`${param} eingeben`}
+                      />
+                    </div>
+                  ))}
+
+                  <Button 
+                    onClick={applyTemplate} 
+                    disabled={!selectedTemplate || !selectedColumn || isApplyingTemplate}
+                    className="w-full"
+                  >
+                    {isApplyingTemplate ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Wird angewendet...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4 mr-2" />
+                        Vorlage anwenden
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Vorlage-Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {selectedTemplateData ? (
+                    <div className="space-y-4">
+                      <div>
+                        <Badge>{selectedTemplateData.category}</Badge>
+                        <h3 className="font-medium mt-2">{selectedTemplateData.name}</h3>
+                        <p className="text-sm text-muted-foreground">{selectedTemplateData.description}</p>
+                      </div>
+                      
+                      <div>
+                        <Label>Formel</Label>
+                        <code className="block p-2 bg-muted rounded text-sm mt-1">
+                          {selectedTemplateData.formula}
+                        </code>
+                      </div>
+
+                      <div>
+                        <Label>Beispiel</Label>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {selectedTemplateData.example}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">Wählen Sie eine Vorlage aus</p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
+          </TabsContent>
+
+          {/* Statistics */}
+          <TabsContent value="statistics">
+            <Card>
+              <CardHeader>
+                <CardTitle>Daten-Statistiken</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {statistics && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center p-4 border rounded">
+                        <div className="text-2xl font-bold">{statistics.totalRows}</div>
+                        <div className="text-sm text-muted-foreground">Gesamtzeilen</div>
+                      </div>
+                      <div className="text-center p-4 border rounded">
+                        <div className="text-2xl font-bold">{statistics.totalColumns}</div>
+                        <div className="text-sm text-muted-foreground">Spalten</div>
+                      </div>
+                      <div className="text-center p-4 border rounded">
+                        <div className="text-2xl font-bold">{statistics.emptyRows}</div>
+                        <div className="text-sm text-muted-foreground">Leere Zeilen</div>
+                      </div>
+                      <div className="text-center p-4 border rounded">
+                        <div className="text-2xl font-bold">{Math.round(csvData.rowCount / 1024 * 100) / 100}K</div>
+                        <div className="text-sm text-muted-foreground">Datenpunkte</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="font-medium mb-4">Spalten-Analyse</h3>
+                      <div className="space-y-3">
+                        {statistics.columnStats.map((stat, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 border rounded">
+                            <div>
+                              <div className="font-medium">{stat.name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {stat.nonEmptyValues} von {stat.totalValues} Werte | {stat.uniqueValues} eindeutig
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm text-muted-foreground">Beispiele:</div>
+                              <div className="text-sm">{stat.sampleValues.slice(0, 2).join(', ')}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Export */}
+          <TabsContent value="export">
+            <Card>
+              <CardHeader>
+                <CardTitle>Daten exportieren</CardTitle>
+                <CardDescription>
+                  Exportieren Sie die bearbeiteten Daten in verschiedenen Formaten
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Button onClick={() => exportData('csv')} className="h-20 flex-col gap-2">
+                    <FileText className="w-6 h-6" />
+                    Als CSV exportieren
+                    <span className="text-xs text-muted-foreground">Kompatibel mit Excel</span>
+                  </Button>
+                  
+                  <Button onClick={() => exportData('json')} variant="outline" className="h-20 flex-col gap-2">
+                    <Settings className="w-6 h-6" />
+                    Als JSON exportieren
+                    <span className="text-xs text-muted-foreground">Für APIs und Entwicklung</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );

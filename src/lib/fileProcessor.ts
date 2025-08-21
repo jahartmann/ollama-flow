@@ -19,7 +19,7 @@ export interface ParseOptions {
 class FileProcessor {
   async parseCSV(file: File, options: ParseOptions = {}): Promise<CSVParseResult> {
     return new Promise((resolve, reject) => {
-      const config: Papa.ParseConfig<string[]> = {
+      Papa.parse(file, {
         complete: (results) => {
           console.log('CSV parsing completed:', results);
           
@@ -65,10 +65,9 @@ class FileProcessor {
         header: false,
         delimiter: options.delimiter || '',
         skipEmptyLines: options.skipEmptyLines !== false,
-        dynamicTyping: false // Keep everything as strings
-      };
-
-      Papa.parse(file, config);
+        dynamicTyping: false,
+        transformHeader: undefined
+      });
     });
   }
 
