@@ -112,67 +112,69 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
       const mappedRow: string[] = [];
       
       mappings.forEach(mapping => {
-        if (mapping.sourceColumn) {
+        let value = '';
+        
+        // If there's a formula, prioritize it over source column
+        if (mapping.formula) {
+          try {
+            // Basic formula support - CONCAT, UPPER, LOWER, etc.
+            let formula = mapping.formula;
+            
+            // Replace column references with actual values
+            sourceData.headers.forEach((header, headerIndex) => {
+              const headerValue = row[headerIndex] || '';
+              // Use more specific regex to avoid cutting off @ symbols and other characters
+              formula = formula.replace(new RegExp(`(?<!\\w)${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\w)`, 'g'), `"${headerValue}"`);
+            });
+            
+            // Basic formula evaluation
+            if (formula.startsWith('CONCAT(')) {
+              const params = formula.slice(7, -1).split(',').map(p => p.trim().replace(/"/g, ''));
+              value = params.join('');
+            } else if (formula.startsWith('UPPER(')) {
+              const param = formula.slice(6, -1).replace(/"/g, '');
+              value = param.toUpperCase();
+            } else if (formula.startsWith('LOWER(')) {
+              const param = formula.slice(6, -1).replace(/"/g, '');
+              value = param.toLowerCase();
+            } else {
+              // For direct formulas like "Benutzername@appleid.ds-greiz.de"
+              value = formula.replace(/"/g, '');
+            }
+          } catch (error) {
+            console.error('Formula error:', error);
+            value = mapping.defaultValue || '';
+          }
+        }
+        // Otherwise use source column with transformations
+        else if (mapping.sourceColumn) {
           const sourceIndex = sourceData.headers.indexOf(mapping.sourceColumn);
           if (sourceIndex !== -1) {
-            let value = row[sourceIndex] || '';
+            value = row[sourceIndex] || '';
             
-            // Apply transformation or formula
-            if (mapping.formula) {
-              // Apply formula (simplified implementation)
-              try {
-                // Basic formula support - CONCAT, UPPER, LOWER, etc.
-                let formula = mapping.formula;
-                
-                // Replace column references with actual values
-                sourceData.headers.forEach((header, headerIndex) => {
-                  const headerValue = row[headerIndex] || '';
-                  // Use more specific regex to avoid cutting off @ symbols and other characters
-                  formula = formula.replace(new RegExp(`(?<!\\w)${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\w)`, 'g'), `"${headerValue}"`);
-                });
-                
-                // Basic formula evaluation
-                if (formula.startsWith('CONCAT(')) {
-                  const params = formula.slice(7, -1).split(',').map(p => p.trim().replace(/"/g, ''));
-                  value = params.join('');
-                } else if (formula.startsWith('UPPER(')) {
-                  const param = formula.slice(6, -1).replace(/"/g, '');
-                  value = param.toUpperCase();
-                } else if (formula.startsWith('LOWER(')) {
-                  const param = formula.slice(6, -1).replace(/"/g, '');
-                  value = param.toLowerCase();
-                } else {
-                  value = formula.replace(/"/g, '');
-                }
-              } catch (error) {
-                console.error('Formula error:', error);
-                value = value; // fallback to original value
-              }
-            } else {
-              // Apply standard transformations
-              switch (mapping.transformation) {
-                case 'uppercase':
-                  value = value.toUpperCase();
-                  break;
-                case 'lowercase':
-                  value = value.toLowerCase();
-                  break;
-                case 'trim':
-                  value = value.trim();
-                  break;
-                case 'format_phone':
-                  value = value.replace(/\D/g, '').replace(/(\d{4})(\d{3})(\d{4})/, '+49 $1 $2 $3');
-                  break;
-              }
+            // Apply standard transformations
+            switch (mapping.transformation) {
+              case 'uppercase':
+                value = value.toUpperCase();
+                break;
+              case 'lowercase':
+                value = value.toLowerCase();
+                break;
+              case 'trim':
+                value = value.trim();
+                break;
+              case 'format_phone':
+                value = value.replace(/\D/g, '').replace(/(\d{4})(\d{3})(\d{4})/, '+49 $1 $2 $3');
+                break;
             }
-            
-            mappedRow.push(value);
           } else {
-            mappedRow.push(mapping.defaultValue || '');
+            value = mapping.defaultValue || '';
           }
         } else {
-          mappedRow.push(mapping.defaultValue || '');
+          value = mapping.defaultValue || '';
         }
+        
+        mappedRow.push(value);
       });
       
       return mappedRow;
