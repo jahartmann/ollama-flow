@@ -439,59 +439,64 @@ WICHTIG:
             </Select>
           </div>
 
-          {/* AI Assistant Toggle */}
-          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="ai-enabled"
-                checked={aiEnabled}
-                onCheckedChange={setAiEnabled}
-              />
-              <label htmlFor="ai-enabled" className="text-sm font-medium flex items-center gap-2">
-                <Brain className="w-4 h-4" />
-                KI-Assistent aktivieren
-              </label>
-            </div>
-            {aiEnabled && (
-              <Sparkles className="w-4 h-4 text-primary" />
-            )}
-          </div>
-
-          {aiEnabled && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="space-y-4">
-                   <div>
-                     <label className="text-sm font-medium mb-2 block">KI-Mapping Anweisungen (optional)</label>
-                     <Textarea
-                       placeholder="Lassen Sie leer für automatisches Mapping oder geben Sie spezifische Anweisungen ein wie: 'Mappe alles so, dass es passt', 'Konvertiere Telefonnummern in deutsches Format', 'Nur aktive Kunden filtern'"
-                       value={aiPrompt}
-                       onChange={(e) => setAiPrompt(e.target.value)}
-                       className="min-h-[80px]"
-                     />
-                   </div>
-                   <Button
-                     onClick={handleAiMapping}
-                     disabled={isAiProcessing}
-                     variant="outline"
-                     size="sm"
-                   >
-                     {isAiProcessing ? (
-                       <>
-                         <Brain className="w-4 h-4 mr-2 animate-pulse" />
-                         KI arbeitet...
-                       </>
-                     ) : (
-                       <>
-                         <Sparkles className="w-4 h-4 mr-2" />
-                         Automatisches Mapping
-                       </>
-                     )}
-                   </Button>
+          {/* AI Assistant - Hidden/Compact Section */}
+          <details className="group">
+            <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 py-1">
+              <Brain className="w-3 h-3" />
+              Erweiterte Optionen
+              <span className="ml-auto group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="mt-3 p-3 bg-muted/30 rounded border-l-2 border-muted-foreground/20">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="ai-enabled"
+                    checked={aiEnabled}
+                    onCheckedChange={setAiEnabled}
+                  />
+                  <label htmlFor="ai-enabled" className="text-xs font-medium">
+                    KI-Assistent
+                  </label>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                {aiEnabled && (
+                  <Sparkles className="w-3 h-3 text-primary" />
+                )}
+              </div>
+
+              {aiEnabled && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">KI-Anweisungen (optional)</label>
+                    <Textarea
+                      placeholder="z.B: 'Mappe alles so, dass es passt'"
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      className="min-h-[60px] text-xs"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleAiMapping}
+                    disabled={isAiProcessing}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    {isAiProcessing ? (
+                      <>
+                        <Brain className="w-3 h-3 mr-1 animate-pulse" />
+                        Verarbeitet...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        Auto-Mapping
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </details>
         </CardContent>
       </Card>
 
