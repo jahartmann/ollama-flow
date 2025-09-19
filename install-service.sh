@@ -19,10 +19,11 @@ After=network.target
 Type=simple
 User=$USER
 WorkingDirectory=$APP_DIR
+ExecStartPre=/usr/bin/npm install
 ExecStart=/usr/bin/npm run dev -- --host 0.0.0.0 --port 8080
 Restart=always
 RestartSec=10
-Environment=NODE_ENV=production
+Environment=NODE_ENV=development
 
 # Logging
 StandardOutput=journal
