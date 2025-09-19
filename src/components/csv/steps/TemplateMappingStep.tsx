@@ -127,7 +127,8 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
                 // Replace column references with actual values
                 sourceData.headers.forEach((header, headerIndex) => {
                   const headerValue = row[headerIndex] || '';
-                  formula = formula.replace(new RegExp(`\\b${header}\\b`, 'g'), `"${headerValue}"`);
+                  // Use more specific regex to avoid cutting off @ symbols and other characters
+                  formula = formula.replace(new RegExp(`(?<!\\w)${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\w)`, 'g'), `"${headerValue}"`);
                 });
                 
                 // Basic formula evaluation
