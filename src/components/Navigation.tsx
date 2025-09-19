@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { 
@@ -9,19 +9,15 @@ import {
   Database,
   Brain,
   Palette,
-  MessageSquare
+  MessageSquare,
+  ChevronDown
 } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
+  const [showAIFeatures, setShowAIFeatures] = useState(false);
 
-  const navigationItems = [
-    {
-      path: '/',
-      label: 'CSV Transformer',
-      icon: Zap,
-      description: 'Daten-Transformation mit Rezepten'
-    },
+  const aiNavigationItems = [
     {
       path: '/ai-chat',
       label: 'KI-Chat',
@@ -51,31 +47,53 @@ const Navigation = () => {
           </Link>
 
           {/* Navigation Items */}
-          <div className="flex space-x-1">
-            {navigationItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              
-              return (
-                <Link key={item.path} to={item.path}>
-                  <Button
-                    variant={isActive ? "default" : "ghost"}
-                    size="sm"
-                    className="flex items-center gap-2 px-4"
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="hidden sm:inline">{item.label}</span>
-                  </Button>
-                </Link>
-              );
-            })}
-          </div>
+          <div className="flex items-center space-x-1">
+            {/* Main CSV Transformer Tab */}
+            <Link to="/">
+              <Button
+                variant={location.pathname === '/' ? "default" : "ghost"}
+                size="sm"
+                className="flex items-center gap-2 px-4"
+              >
+                <Zap className="w-4 h-4" />
+                <span className="hidden sm:inline">CSV Transformer</span>
+              </Button>
+            </Link>
 
-          {/* AI Status Indicator */}
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1 px-3 py-1 rounded-full bg-muted text-muted-foreground text-sm">
-              <Brain className="w-3 h-3" />
-              <span className="hidden sm:inline">AI Ready</span>
+            {/* AI Features Toggle */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAIFeatures(!showAIFeatures)}
+                className="flex items-center gap-1 px-3"
+              >
+                <Brain className="w-4 h-4" />
+                <ChevronDown className={`w-3 h-3 transition-transform ${showAIFeatures ? 'rotate-180' : ''}`} />
+              </Button>
+
+              {/* AI Features Dropdown */}
+              {showAIFeatures && (
+                <div className="absolute right-0 mt-2 w-48 bg-popover border rounded-md shadow-lg z-50">
+                  <div className="py-1">
+                    {aiNavigationItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = location.pathname === item.path;
+                      
+                      return (
+                        <Link key={item.path} to={item.path} onClick={() => setShowAIFeatures(false)}>
+                          <div className={`flex items-center gap-2 px-4 py-2 text-sm hover:bg-muted cursor-pointer ${
+                            isActive ? 'bg-muted text-foreground' : 'text-muted-foreground'
+                          }`}>
+                            <Icon className="w-4 h-4" />
+                            <span>{item.label}</span>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
