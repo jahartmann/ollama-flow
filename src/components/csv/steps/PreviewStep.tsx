@@ -279,12 +279,12 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
           {/* Modern Action Buttons */}
           <div className="flex flex-col lg:flex-row gap-4 pt-6 border-t border-border/50">
             <Button 
-              onClick={handleExport}
+              onClick={() => onExport(exportFilename)}
               className="glow-button h-12 text-base font-medium flex-1 lg:flex-none lg:px-8"
               disabled={!finalData || !exportFilename.trim()}
             >
               <Download className="w-5 h-5 mr-3" />
-              Exportieren als "{exportFilename}.csv"
+              Exportieren als "{exportFilename.slice(0, 15)}{exportFilename.length > 15 ? '...' : ''}.csv"
             </Button>
             
             <div className="flex gap-3 flex-1 lg:flex-none">

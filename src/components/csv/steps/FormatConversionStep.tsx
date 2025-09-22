@@ -35,8 +35,9 @@ const FormatConversionStep: React.FC<FormatConversionStepProps> = ({
     try {
       const file = files[0];
       
-      // Export mit neuem Delimiter
-      const newFilename = file.name.replace(/\.[^/.]+$/, '') + '_converted.csv';
+      // Export mit neuem Delimiter - verkürze Dateiname
+      const baseFilename = file.name.replace(/\.[^/.]+$/, '').slice(0, 20);
+      const newFilename = `${baseFilename}_converted.csv`;
       fileProcessor.exportAsCSV(file.data, file.headers, newFilename, selectedDelimiter);
       
     } catch (error) {
@@ -148,27 +149,27 @@ const FormatConversionStep: React.FC<FormatConversionStepProps> = ({
           </>
         )}
 
-        {/* Navigation */}
-        <div className="flex justify-between pt-6 border-t">
-          <Button 
-            variant="outline" 
-            onClick={onBack}
-            className="gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Zurück
-          </Button>
-
-          <div className="space-x-2">
-            {onReturnToHub && (
-              <Button variant="outline" onClick={onReturnToHub}>
-                Zurück zum Hub
+            {/* Navigation */}
+            <div className="flex justify-between pt-6 border-t">
+              <Button 
+                variant="outline" 
+                onClick={onBack}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Zurück
               </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+
+              <div className="space-x-2">
+                {onReturnToHub && (
+                  <Button variant="outline" onClick={onReturnToHub}>
+                    Zurück zum Hub
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
   );
 };
 

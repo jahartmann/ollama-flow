@@ -345,22 +345,26 @@ const ComparisonStep: React.FC<ComparisonStepProps> = ({
       )}
 
       {/* Navigation */}
-      <div className="flex justify-between">
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={onBack}>
-            Zurück
-          </Button>
-          {onReturnToHub && (
-            <Button variant="ghost" onClick={onReturnToHub}>
-              Zurück zum Hub
+      <Card className="mt-6">
+        <CardContent className="pt-6">
+          <div className="flex justify-between">
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onBack}>
+                Zurück
+              </Button>
+              {onReturnToHub && (
+                <Button variant="ghost" onClick={onReturnToHub}>
+                  Zurück zum Hub
+                </Button>
+              )}
+            </div>
+            
+            <Button onClick={onFinish} className="px-8">
+              Vergleich abschließen
             </Button>
-          )}
-        </div>
-        
-        <Button onClick={onFinish} className="px-8">
-          Vergleich abschließen
-        </Button>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

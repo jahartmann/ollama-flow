@@ -424,7 +424,11 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
     }
 
     try {
-      const exportName = filename ? `${filename}.csv` : `processed_${dataToExport.name}`;
+      // Verkürze Dateiname für bessere Übersicht
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const operation = selectedOperation === 'merge' ? 'transformed' : 'processed';
+      const exportName = filename ? `${filename}.csv` : `${operation}_${timestamp}.csv`;
+      
       fileProcessor.exportAsCSV(finalData, finalHeaders, exportName);
       toast({
         title: "Export erfolgreich",
