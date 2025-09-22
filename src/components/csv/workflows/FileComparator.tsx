@@ -38,10 +38,51 @@ const FileComparator: React.FC<FileComparatorProps> = ({
   const file1 = files[file1Index];
   const file2 = files[file2Index];
 
-  // Calculate differences
+  // Calculate differences with all columns
   const diffResults = useMemo<DiffResult[]>(() => {
-    if (!file1 || !file2 || !keyColumn || file1Index === file2Index) return [];
+    if (!file1 || !file2 || file1Index === file2Index) return [];
+    
+    // If no key column selected, compare all rows by index
+    if (!keyColumn) {
+      const results: DiffResult[] = [];
+      const maxRows = Math.max(file1.data.length, file2.data.length);
+      
+      for (let i = 0; i < maxRows; i++) {
+        const row1 = file1.data[i];
+        const row2 = file2.data[i];
+        
+        if (!row1 && row2) {
+          results.push({
+            type: 'added',
+            rowIndex: i,
+            data: row2
+          });
+        } else if (row1 && !row2) {
+          results.push({
+            type: 'removed',
+            rowIndex: i,
+            data: row1
+          });
+        } else if (row1 && row2) {
+          // Check all columns for differences
+          const isModified = row1.some((cell, colIndex) => {
+            const file2ColIndex = file2.headers.findIndex(h => h === file1.headers[colIndex]);
+            return file2ColIndex !== -1 && cell !== (row2[file2ColIndex] || '');
+          });
+          
+          results.push({
+            type: isModified ? 'modified' : 'unchanged',
+            rowIndex: i,
+            data: row2,
+            originalData: isModified ? row1 : undefined
+          });
+        }
+      }
+      
+      return results;
+    }
 
+    // Key-based comparison
     const keyColumnIndex = file1.headers.indexOf(keyColumn);
     if (keyColumnIndex === -1) return [];
 
@@ -216,9 +257,10 @@ const FileComparator: React.FC<FileComparatorProps> = ({
               <label className="text-sm font-medium mb-2 block">Schlüssel-Spalte</label>
               <Select value={keyColumn} onValueChange={setKeyColumn}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Spalte auswählen" />
+                  <SelectValue placeholder="Optional: Spalte für Zuordnung" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">Keine (Zeilenweise vergleichen)</SelectItem>
                   {file1?.headers.filter(header => 
                     file2?.headers.includes(header)
                   ).map((header) => (
@@ -234,7 +276,7 @@ const FileComparator: React.FC<FileComparatorProps> = ({
       </Card>
 
       {/* Results */}
-      {keyColumn && file1Index !== file2Index && (
+      {file1Index !== file2Index && (
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -322,7 +364,7 @@ const FileComparator: React.FC<FileComparatorProps> = ({
                   </thead>
                   <tbody>
                     {filteredResults.slice(0, 50).map((result, index) => (
-                      <tr 
+                       <tr 
                         key={index} 
                         className={`border-b ${
                           result.type === 'added' ? 'bg-green-50 hover:bg-green-100' :
@@ -330,28 +372,43 @@ const FileComparator: React.FC<FileComparatorProps> = ({
                           result.type === 'modified' ? 'bg-orange-50 hover:bg-orange-100' :
                           'hover:bg-muted/50'
                         }`}
-                      >
-                        <td className="px-4 py-3">
-                          <Badge 
-                            variant={
-                              result.type === 'added' ? 'default' :
-                              result.type === 'removed' ? 'destructive' :
-                              result.type === 'modified' ? 'secondary' :
-                              'outline'
-                            }
-                            className="text-xs"
-                          >
-                            {result.type === 'added' ? 'Neu' :
-                             result.type === 'removed' ? 'Entfernt' :
-                             result.type === 'modified' ? 'Geändert' : 'Gleich'}
-                          </Badge>
-                        </td>
-                        {result.data.map((cell, cellIndex) => (
-                          <td key={cellIndex} className="px-4 py-3">
-                            {cell}
-                          </td>
-                        ))}
-                      </tr>
+                       >
+                         <td className="px-4 py-3">
+                           <Badge 
+                             variant={
+                               result.type === 'added' ? 'default' :
+                               result.type === 'removed' ? 'destructive' :
+                               result.type === 'modified' ? 'secondary' :
+                               'outline'
+                             }
+                             className="text-xs"
+                           >
+                             {result.type === 'added' ? 'Neu' :
+                              result.type === 'removed' ? 'Entfernt' :
+                              result.type === 'modified' ? 'Geändert' : 'Gleich'}
+                           </Badge>
+                         </td>
+                         {result.data.map((cell, cellIndex) => {
+                           // Check if this cell is different from original
+                           const originalCell = result.originalData?.[cellIndex];
+                           const isDifferent = result.type === 'modified' && originalCell !== undefined && originalCell !== cell;
+                           
+                           return (
+                             <td key={cellIndex} className="px-4 py-3">
+                               <div className={isDifferent ? 'relative' : ''}>
+                                 <span className={isDifferent ? 'bg-yellow-200 px-1 rounded' : ''}>
+                                   {cell}
+                                 </span>
+                                 {isDifferent && (
+                                   <div className="text-xs text-muted-foreground mt-1">
+                                     Vorher: <span className="bg-red-100 px-1 rounded">{originalCell}</span>
+                                   </div>
+                                 )}
+                               </div>
+                             </td>
+                           );
+                         })}
+                       </tr>
                     ))}
                   </tbody>
                 </table>
@@ -364,7 +421,7 @@ const FileComparator: React.FC<FileComparatorProps> = ({
               </p>
             )}
 
-            {filteredResults.length === 0 && keyColumn && (
+            {filteredResults.length === 0 && (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">
                   {showOnlyDifferences ? 'Keine Unterschiede gefunden' : 'Keine Daten zum Anzeigen'}
