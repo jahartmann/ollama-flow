@@ -1,4 +1,4 @@
-import CSVWizard from "@/components/csv/CSVWizard";
+import SimpleCSVWizard from "@/components/csv/SimpleCSVWizard";
 import { CSVFile, TransformationRecipe } from "@/lib/transformationEngine";
 import { useState } from "react";
 
@@ -10,7 +10,7 @@ const Index = () => {
   };
 
   return (
-    <CSVWizard 
+    <SimpleCSVWizard 
       onComplete={handleComplete}
     />
   );
