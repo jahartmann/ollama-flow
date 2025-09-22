@@ -29,6 +29,26 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
 }) => {
   const sourceData = processedData || (originalFiles.length > 0 ? originalFiles[0] : null);
   
+  // Enhanced formula evaluation function
+  const evaluateFormula = React.useCallback((formula: string, row: string[], headers: string[]): string => {
+    try {
+      let result = formula.trim();
+      
+      // Replace column references with actual values (case-insensitive)
+      headers.forEach((header, index) => {
+        const value = row[index] || '';
+        // Replace direct column name references (for formulas like "Name@domain.de")
+        const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+        result = result.replace(regex, value);
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('Formula evaluation error:', error, { formula, row, headers });
+      return formula; // Return original formula if evaluation fails
+    }
+  }, []);
+  
   // Transform data using the same logic as TemplateMappingStep
   const finalData = React.useMemo(() => {
     if (!sourceData || !selectedTemplate || columnMappings.length === 0) {
@@ -85,27 +105,8 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
       data: transformedData,
       name: `${selectedTemplate.name}_${sourceData.name.replace('.csv', '')}`
     };
-  }, [sourceData, selectedTemplate, columnMappings]);
+  }, [sourceData, selectedTemplate, columnMappings, evaluateFormula]);
 
-  // Enhanced formula evaluation function (same as TemplateMappingStep)
-  const evaluateFormula = (formula: string, row: string[], headers: string[]): string => {
-    try {
-      let result = formula.trim();
-      
-      // Replace column references with actual values (case-insensitive)
-      headers.forEach((header, index) => {
-        const value = row[index] || '';
-        // Replace direct column name references (for formulas like "Name@domain.de")
-        const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-        result = result.replace(regex, value);
-      });
-      
-      return result;
-    } catch (error) {
-      console.error('Formula evaluation error:', error, { formula, row, headers });
-      return formula; // Return original formula if evaluation fails
-    }
-  };
   const [exportFilename, setExportFilename] = useState(() => {
     const templateName = selectedTemplate?.name || 'processed';
     const baseName = finalData?.name?.replace('.csv', '') || 'data';
