@@ -106,38 +106,62 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
         let value = '';
         
         // If there's a formula, prioritize it over source column
-        if (mapping.formula) {
+        if (mapping.formula && mapping.formula.trim()) {
           try {
-            // Enhanced formula support with proper variable handling
-            let formula = mapping.formula;
-            
-            // Replace column references with actual values first
-            sourceData.headers.forEach((header, headerIndex) => {
-              const headerValue = row[headerIndex] || '';
-              // Replace exact column name matches (case-insensitive)
-              const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-              formula = formula.replace(regex, `"${headerValue}"`);
-            });
+            let formula = mapping.formula.trim();
             
             // Handle different formula types
             if (formula.startsWith('CONCAT(')) {
               // Extract parameters from CONCAT function
               const params = formula.slice(7, -1).split(',').map(p => p.trim());
               value = params.map(param => {
-                // Remove quotes and return the value
-                return param.replace(/^["']|["']$/g, '');
+                let cleanParam = param.replace(/^["']|["']$/g, '');
+                // Replace column references in each parameter
+                sourceData.headers.forEach((header, headerIndex) => {
+                  const headerValue = row[headerIndex] || '';
+                  const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+                  cleanParam = cleanParam.replace(regex, headerValue);
+                });
+                return cleanParam;
               }).join('');
             } else if (formula.startsWith('UPPER(')) {
-              const param = formula.slice(6, -1).replace(/^["']|["']$/g, '');
+              let param = formula.slice(6, -1).replace(/^["']|["']$/g, '');
+              // Replace column references
+              sourceData.headers.forEach((header, headerIndex) => {
+                const headerValue = row[headerIndex] || '';
+                const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+                param = param.replace(regex, headerValue);
+              });
               value = param.toUpperCase();
             } else if (formula.startsWith('LOWER(')) {
-              const param = formula.slice(6, -1).replace(/^["']|["']$/g, '');
+              let param = formula.slice(6, -1).replace(/^["']|["']$/g, '');
+              // Replace column references
+              sourceData.headers.forEach((header, headerIndex) => {
+                const headerValue = row[headerIndex] || '';
+                const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+                param = param.replace(regex, headerValue);
+              });
               value = param.toLowerCase();
             } else {
-              // For direct formulas, treat as template string
-              // Replace remaining column references and clean up quotes
-              value = formula.replace(/"/g, '');
+              // For direct formulas (like "Benutzername@domain.de"), replace column references
+              value = formula;
+              sourceData.headers.forEach((header, headerIndex) => {
+                const headerValue = row[headerIndex] || '';
+                // Create a more specific regex that matches the column name as a whole word
+                // but not as part of email addresses or other text
+                const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b(?!@)`, 'gi');
+                value = value.replace(regex, headerValue);
+              });
             }
+            
+            // Debug logging
+            console.log('Formula processing:', {
+              original: mapping.formula,
+              processed: value,
+              sourceData: sourceData.headers,
+              currentRow: row
+            });
+            
           } catch (error) {
             console.error('Formula error:', error);
             value = mapping.defaultValue || '';
