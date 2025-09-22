@@ -116,134 +116,204 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
     onExport(exportFilename);
   };
 
+  // Debug logging to help identify the white screen issue
+  console.log('PreviewStep render:', {
+    originalFiles: originalFiles?.length,
+    processedData: !!processedData,
+    selectedTemplate: !!selectedTemplate,
+    columnMappings: columnMappings?.length,
+    finalData: !!finalData
+  });
+
+  if (!sourceData) {
+    return (
+      <div className="space-y-6">
+        <div className="glass-card p-8 text-center">
+          <div className="text-muted-foreground">
+            <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <h3 className="text-lg font-medium mb-2">Keine Daten verfügbar</h3>
+            <p>Es wurden keine Daten zum Anzeigen gefunden.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <Card className="shadow-elegant">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Eye className="w-5 h-5" />
-            Ergebnis-Vorschau
+      <div className="glass-card">
+        <CardHeader className="border-b border-border/50">
+          <CardTitle className="flex items-center gap-3">
+            <div className="glow-button p-2 rounded-lg">
+              <Eye className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold">Ergebnis-Vorschau</h2>
+              <p className="text-sm text-muted-foreground font-normal">
+                Überprüfen Sie Ihre transformierten Daten vor dem Export
+              </p>
+            </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="border-l-4 border-l-blue-500">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">Quell-Dateien</Badge>
+        <CardContent className="p-8 space-y-8">
+          {/* Modern Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="data-card p-6 group hover:scale-105 transition-all duration-300">
+              <div className="flex items-center justify-between mb-4">
+                <Badge className="bg-data-primary/10 text-data-primary border-data-primary/20">
+                  Quell-Dateien
+                </Badge>
+                <div className="w-8 h-8 rounded-full bg-data-primary/20 flex items-center justify-center">
+                  <FileText className="w-4 h-4 text-data-primary" />
                 </div>
-                <p className="text-2xl font-bold mt-2">{originalFiles.length}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-3xl font-bold text-data-primary">{originalFiles.length}</p>
                 <p className="text-sm text-muted-foreground">
                   {originalFiles.reduce((total, file) => total + file.data.length, 0)} Datensätze gesamt
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
             
-            <Card className="border-l-4 border-l-green-500">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">Ergebnis</Badge>
+            <div className="data-card p-6 group hover:scale-105 transition-all duration-300">
+              <div className="flex items-center justify-between mb-4">
+                <Badge className="bg-data-success/10 text-data-success border-data-success/20">
+                  Ergebnis
+                </Badge>
+                <div className="w-8 h-8 rounded-full bg-data-success/20 flex items-center justify-center">
+                  <CheckCircle2 className="w-4 h-4 text-data-success" />
                 </div>
-                <p className="text-2xl font-bold mt-2">
+              </div>
+              <div className="space-y-1">
+                <p className="text-3xl font-bold text-data-success">
                   {finalData ? finalData.data.length : 0}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Zeilen, {finalData ? finalData.headers.length : 0} Spalten
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
             
-            <Card className="border-l-4 border-l-purple-500">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">Template</Badge>
+            <div className="data-card p-6 group hover:scale-105 transition-all duration-300">
+              <div className="flex items-center justify-between mb-4">
+                <Badge className="bg-data-secondary/10 text-data-secondary border-data-secondary/20">
+                  Template
+                </Badge>
+                <div className="w-8 h-8 rounded-full bg-data-secondary/20 flex items-center justify-center">
+                  <Eye className="w-4 h-4 text-data-secondary" />
                 </div>
-                <p className="text-lg font-medium mt-2">
-                  {selectedTemplate ? selectedTemplate.name : 'Kein Template'}
+              </div>
+              <div className="space-y-1">
+                <p className="text-lg font-bold text-data-secondary">
+                  {selectedTemplate ? selectedTemplate.name : 'Original'}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {selectedTemplate ? 'Angewendet' : 'Original-Format'}
+                  {selectedTemplate ? 'Template angewendet' : 'Keine Transformation'}
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
 
-          {/* Live Preview */}
+          {/* Modern Live Preview */}
           {finalData && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Datenvorschau</h3>
-              <LivePreview 
-                files={[finalData]} 
-                recipe={{ 
-                  name: 'Verarbeitung abgeschlossen',
-                  description: 'Finales Ergebnis',
-                  columnMappings: [],
-                  newColumns: []
-                }}
-                onRecipeChange={() => {}}
-              />
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="glow-button p-2 rounded-lg">
+                  <Eye className="w-4 h-4" />
+                </div>
+                <h3 className="text-xl font-bold">Datenvorschau</h3>
+              </div>
+              <div className="glass-card p-6">
+                <LivePreview 
+                  files={[finalData]} 
+                  recipe={{ 
+                    name: 'Verarbeitung abgeschlossen',
+                    description: 'Finales Ergebnis',
+                    columnMappings: [],
+                    newColumns: []
+                  }}
+                  onRecipeChange={() => {}}
+                />
+              </div>
             </div>
           )}
 
-          {/* Export Options */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FileText className="w-4 h-4" />
-                Export-Einstellungen
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="export-filename" className="text-sm font-medium">
-                  Dateiname (ohne .csv Erweiterung)
-                </Label>
-                <Input
-                  id="export-filename"
-                  value={exportFilename}
-                  onChange={(e) => setExportFilename(e.target.value)}
-                  placeholder="Dateiname eingeben..."
-                  className="mt-1"
-                />
+          {/* Modern Export Options */}
+          <div className="glass-card p-6 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="glow-button p-2 rounded-lg">
+                <Download className="w-4 h-4" />
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <h3 className="text-xl font-bold">Export-Einstellungen</h3>
+                <p className="text-sm text-muted-foreground">
+                  Konfigurieren Sie den Dateiexport
+                </p>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <Label htmlFor="export-filename" className="text-sm font-medium">
+                Dateiname (ohne .csv Erweiterung)
+              </Label>
+              <Input
+                id="export-filename"
+                value={exportFilename}
+                onChange={(e) => setExportFilename(e.target.value)}
+                placeholder="Dateiname eingeben..."
+                className="h-12 text-base"
+              />
+            </div>
+          </div>
 
-          {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          {/* Modern Action Buttons */}
+          <div className="flex flex-col lg:flex-row gap-4 pt-6 border-t border-border/50">
             <Button 
               onClick={handleExport}
-              className="flex-1 sm:flex-none"
+              className="glow-button h-12 text-base font-medium flex-1 lg:flex-none lg:px-8"
               disabled={!finalData || !exportFilename.trim()}
             >
-              <Download className="w-4 h-4 mr-2" />
-              CSV exportieren als "{exportFilename}.csv"
+              <Download className="w-5 h-5 mr-3" />
+              Exportieren als "{exportFilename}.csv"
             </Button>
             
-            <div className="flex gap-2 flex-1 sm:flex-none">
-              <Button variant="outline" onClick={onBack} className="flex-1 sm:flex-none">
+            <div className="flex gap-3 flex-1 lg:flex-none">
+              <Button 
+                variant="outline" 
+                onClick={onBack} 
+                className="flex-1 lg:flex-none h-12 text-base"
+              >
                 Zurück
               </Button>
-              <Button onClick={onFinish} className="flex-1 sm:flex-none">
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                Fertig
+              <Button 
+                onClick={onFinish} 
+                className="flex-1 lg:flex-none h-12 text-base bg-data-success hover:bg-data-success/90"
+              >
+                <CheckCircle2 className="w-5 h-5 mr-2" />
+                Abschließen
               </Button>
             </div>
           </div>
 
-          {/* Success Message */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 text-green-800">
-              <CheckCircle2 className="w-5 h-5" />
-              <span className="font-medium">Verarbeitung erfolgreich abgeschlossen!</span>
+          {/* Modern Success Message */}
+          <div className="data-card p-6 border border-data-success/20 bg-data-success/5">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-data-success/20 flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 className="w-5 h-5 text-data-success" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-semibold text-data-success">
+                  Transformation erfolgreich abgeschlossen!
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  Ihre CSV-Daten wurden erfolgreich verarbeitet und sind bereit für den Export. 
+                  Überprüfen Sie die Vorschau und klicken Sie auf "Exportieren" um die Datei herunterzuladen.
+                </p>
+              </div>
             </div>
-            <p className="text-sm text-green-700 mt-1">
-              Ihre CSV-Daten wurden erfolgreich verarbeitet und sind bereit für den Export.
-            </p>
           </div>
         </CardContent>
-      </Card>
+      </div>
     </div>
   );
 };

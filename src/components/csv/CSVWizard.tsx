@@ -433,33 +433,35 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
   }, [processedData, files, onComplete, selectedOperation, toast]);
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-          CSV Transformation Wizard
-        </h1>
-        <p className="text-muted-foreground">
-          Verarbeiten Sie Ihre CSV-Dateien Schritt für Schritt
-        </p>
-      </div>
+    <div className="min-h-screen p-4 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Modern Header */}
+        <div className="text-center space-y-4">
+          <div className="relative">
+            <h1 className="text-4xl lg:text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              CSV Wizard
+            </h1>
+            <p className="text-lg text-muted-foreground mt-2">
+              Transformieren Sie Ihre Daten mit Leichtigkeit
+            </p>
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Progress Sidebar */}
-        <div className="lg:col-span-1">
-          <Card className="sticky top-6">
-            <CardContent className="p-6">
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
+          {/* Modern Progress Sidebar */}
+          <div className="xl:col-span-1">
+            <div className="glass-card sticky top-8 p-6">
               <ProgressIndicator
                 steps={steps}
                 currentStep={currentStep}
                 completedSteps={completedSteps}
               />
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </div>
 
-        {/* Main Content */}
-        <div className="lg:col-span-3">
+          {/* Main Content Area */}
+          <div className="xl:col-span-4">
+            <div className="data-card p-8 min-h-[600px]">
           {currentStep === 0 && (
             <UploadStep
               files={files}
@@ -524,6 +526,8 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
               onFinish={handleFinish}
             />
           )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -21,14 +21,17 @@ export default {
 			backgroundImage: {
 				'gradient-primary': 'var(--gradient-primary)',
 				'gradient-data': 'var(--gradient-data)',
-				'gradient-subtle': 'var(--gradient-subtle)'
+				'gradient-subtle': 'var(--gradient-subtle)',
+				'gradient-card': 'var(--gradient-card)'
 			},
 			boxShadow: {
 				'elegant': 'var(--shadow-elegant)',
-				'data': 'var(--shadow-data)'
+				'data': 'var(--shadow-data)',
+				'glow': 'var(--shadow-glow)'
 			},
 			transitionTimingFunction: {
-				'smooth': 'var(--transition-smooth)'
+				'smooth': 'var(--transition-smooth)',
+				'bounce': 'var(--transition-bounce)'
 			},
 			colors: {
 				border: 'hsl(var(--border))',
