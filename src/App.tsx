@@ -4,29 +4,17 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navigation from "@/components/Navigation";
-import CSVWizard from "@/components/csv/CSVWizard";
+import Index from "@/pages/Index";
 import Settings from "@/components/Settings";
 import AIChat from "@/pages/AIChat";
 import UpdateNotification from "@/components/UpdateNotification";
 import { useUpdateChecker } from "@/hooks/useUpdateChecker";
 import NotFound from "./pages/NotFound";
-import { CSVFile, TransformationRecipe } from "@/lib/transformationEngine";
-import { useState } from "react";
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { updateInfo, dismissUpdate } = useUpdateChecker();
-  const [transformedData, setTransformedData] = useState<CSVFile | null>(null);
-  const [recipes, setRecipes] = useState<TransformationRecipe[]>([]);
-
-  const handleTransform = (data: CSVFile) => {
-    setTransformedData(data);
-  };
-
-  const handleRecipesChange = (newRecipes: TransformationRecipe[]) => {
-    setRecipes(newRecipes);
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -40,11 +28,7 @@ const AppContent = () => {
       <Routes>
         <Route 
           path="/" 
-          element={
-            <CSVWizard 
-              onComplete={handleTransform}
-            />
-          } 
+          element={<Index />} 
         />
         <Route path="/ai-chat" element={<AIChat />} />
         <Route path="/settings" element={<Settings />} />
