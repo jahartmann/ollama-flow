@@ -285,8 +285,16 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
 
   // Mapping completion handler
   const handleMappingComplete = useCallback((mappings: TemplateColumnMapping[], filters: any[]) => {
+    console.log('CSVWizard handleMappingComplete called:', { mappings, filters });
     setColumnMappings(mappings);
     setAppliedFilters(filters);
+    
+    // Save to cache
+    WizardCacheManager.saveState({
+      columnMappings: mappings,
+      appliedFilters: filters
+    });
+    
     toast({
       title: "Mapping abgeschlossen",
       description: "Feldmappings und Filter wurden konfiguriert"
@@ -397,9 +405,12 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
   }, []);
 
   const goToNextStep = useCallback(() => {
+    console.log('goToNextStep called:', { currentStep, stepsLength: steps.length });
     markStepCompleted(currentStep);
     if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
+      const nextStep = currentStep + 1;
+      console.log('Moving to step:', nextStep);
+      setCurrentStep(nextStep);
     }
   }, [currentStep, markStepCompleted, steps.length]);
 
@@ -505,15 +516,22 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
               )}
 
               {currentStep === 4 && (
-                <PreviewStep
-                  originalFiles={files}
-                  processedData={processedData}
-                  selectedTemplate={selectedTemplate}
-                  columnMappings={columnMappings}
-                  onExport={handleExport}
-                  onBack={goToPreviousStep}
-                  onFinish={handleFinish}
-                />
+                <div>
+                  <div className="mb-4 text-sm text-muted-foreground">
+                    Debug: Preview Step - Files: {files.length}, ProcessedData: {processedData ? 'Yes' : 'No'}, 
+                    Template: {selectedTemplate ? selectedTemplate.name : 'None'}, 
+                    Mappings: {columnMappings.length}
+                  </div>
+                  <PreviewStep
+                    originalFiles={files}
+                    processedData={processedData}
+                    selectedTemplate={selectedTemplate}
+                    columnMappings={columnMappings}
+                    onExport={handleExport}
+                    onBack={goToPreviousStep}
+                    onFinish={handleFinish}
+                  />
+                </div>
               )}
             </>
           )}

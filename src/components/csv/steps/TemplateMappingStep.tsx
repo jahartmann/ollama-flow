@@ -294,6 +294,12 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
   };
 
   const handleNext = () => {
+    console.log('TemplateMappingStep handleNext called', {
+      mappings,
+      filters,
+      selectedTemplate,
+      isValid
+    });
     onMappingComplete(mappings, filters);
     onNext();
   };
@@ -313,10 +319,10 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
       </div>
 
       {/* Template Selection */}
-      <Card className="shadow-elegant border-l-4 border-l-primary/50">
-        <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent">
-          <CardTitle className="flex items-center gap-2 text-primary">
-            <LayoutTemplate className="w-5 h-5" />
+      <Card className="shadow-elegant border-l-4 border-l-primary/50 bg-card">
+        <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 border-b border-border">
+          <CardTitle className="flex items-center gap-2 text-foreground">
+            <LayoutTemplate className="w-5 h-5 text-primary" />
             Template-Auswahl
           </CardTitle>
         </CardHeader>
@@ -363,15 +369,15 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
           </div>
 
           {selectedTemplate && (
-            <div className="mt-6 p-4 bg-primary/10 rounded-lg border border-primary/20">
+            <div className="mt-6 p-4 bg-primary/20 rounded-lg border border-primary/30">
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle2 className="w-5 h-5 text-primary" />
-                <h4 className="font-semibold text-primary">Template gewählt: {selectedTemplate.name}</h4>
+                <h4 className="font-semibold text-foreground">Template gewählt: {selectedTemplate.name}</h4>
               </div>
               <p className="text-sm text-muted-foreground mb-3">{selectedTemplate.description}</p>
               <div className="flex flex-wrap gap-2">
                 {selectedTemplate.columns?.map(col => (
-                  <Badge key={col.name} variant="secondary" className="text-xs">
+                  <Badge key={col.name} variant="secondary" className="text-xs bg-secondary/80 text-secondary-foreground">
                     {col.name}
                   </Badge>
                 ))}
@@ -383,17 +389,17 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
 
       {/* Field Mappings */}
       {selectedTemplate && (
-        <Card className="shadow-elegant border-l-4 border-l-blue-500">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-transparent">
-            <CardTitle className="flex items-center gap-2 text-blue-700">
-              <MapPin className="w-5 h-5" />
+        <Card className="shadow-elegant border-l-4 border-l-accent bg-card">
+          <CardHeader className="bg-gradient-to-r from-accent/10 to-accent/5 border-b border-border">
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <MapPin className="w-5 h-5 text-accent" />
               Feld-Zuordnung ({mappings.length} Felder)
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleAiMapping}
                 disabled={isAiProcessing || !sourceData}
-                className="ml-auto border-blue-300 hover:bg-blue-50"
+                className="ml-auto"
               >
                 {isAiProcessing ? (
                   <>
@@ -411,22 +417,22 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
           </CardHeader>
           <CardContent className="pt-6">
             {/* Help Section */}
-            <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+            <div className="mb-6 p-4 bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-lg">
               <div className="flex items-start gap-3">
-                <Mail className="w-6 h-6 text-green-600 mt-0.5" />
+                <Mail className="w-6 h-6 text-primary mt-0.5" />
                 <div>
-                  <h4 className="font-semibold text-green-800 mb-2">💡 E-Mail-Erstellung Anleitung</h4>
-                  <div className="space-y-2 text-sm text-green-700">
+                  <h4 className="font-semibold text-foreground mb-2">💡 E-Mail-Erstellung Anleitung</h4>
+                  <div className="space-y-2 text-sm text-muted-foreground">
                     <p><strong>Für E-Mail-Adressen:</strong> Verwenden Sie die Formel-Funktion</p>
-                    <div className="bg-white p-3 rounded border-l-4 border-green-400">
+                    <div className="bg-card p-3 rounded border-l-4 border-primary">
                       <div className="font-mono text-sm">
-                        <div className="text-green-600 mb-1">✓ Richtig:</div>
-                        <div className="bg-green-50 p-2 rounded">
-                          <code>Benutzername@appleid.ds-greiz.de</code>
+                        <div className="text-primary mb-1">✓ Richtig:</div>
+                        <div className="bg-primary/5 p-2 rounded">
+                          <code className="text-foreground">Benutzername@appleid.ds-greiz.de</code>
                         </div>
                       </div>
                     </div>
-                    <p className="text-xs text-green-600">
+                    <p className="text-xs text-primary">
                       Der Spaltenname wird automatisch durch den tatsächlichen Wert ersetzt!
                     </p>
                   </div>
@@ -436,23 +442,23 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
             
             <div className="space-y-4">
               {mappings.map((mapping, index) => (
-                <Card key={index} className="border-2 hover:border-primary/40 transition-all duration-200 bg-gradient-to-r from-white to-primary/5">
+                <Card key={index} className="border-2 hover:border-primary/60 transition-all duration-200 bg-card">
                   <CardContent className="p-5">
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
                       {/* Template Field */}
                       <div>
-                        <label className="text-sm font-semibold text-primary block mb-2 flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
+                        <label className="text-sm font-semibold text-foreground block mb-2 flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-primary" />
                           Ziel-Feld
                         </label>
-                        <div className="p-3 bg-primary/10 rounded-lg text-center border-2 border-dashed border-primary/30">
-                          <span className="font-semibold text-primary">{mapping.templateColumn}</span>
+                        <div className="p-3 bg-primary/20 rounded-lg text-center border-2 border-dashed border-primary/40">
+                          <span className="font-semibold text-foreground">{mapping.templateColumn}</span>
                         </div>
                       </div>
                       
                       {/* Source Column */}
                       <div>
-                        <label className="text-sm font-medium block mb-2">
+                        <label className="text-sm font-medium text-foreground block mb-2">
                           Quell-Spalte
                         </label>
                         <Select 
@@ -475,32 +481,32 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
                         </Select>
                       </div>
                       
-                      {/* Formula */}
-                      <div>
-                        <label className="text-sm font-medium block mb-2 flex items-center gap-1">
-                          <Wand2 className="w-3 h-3" />
-                          Formel/Template
-                        </label>
-                        <Input
-                          placeholder="z.B. Benutzername@appleid.ds-greiz.de"
-                          value={mapping.formula || ''}
-                          onChange={(e) => updateMapping(index, 'formula', e.target.value)}
-                          className="w-full border-2 focus:border-blue-400 h-10"
-                        />
-                      </div>
-                      
-                      {/* Default Value */}
-                      <div>
-                        <label className="text-sm font-medium block mb-2">
-                          Standard-Wert
-                        </label>
-                        <Input
-                          placeholder="Fallback-Wert"
-                          value={mapping.defaultValue || ''}
-                          onChange={(e) => updateMapping(index, 'defaultValue', e.target.value)}
-                          className="w-full border-2 focus:border-primary h-10"
-                        />
-                      </div>
+                       {/* Formula */}
+                       <div>
+                         <label className="text-sm font-medium text-foreground block mb-2 flex items-center gap-1">
+                           <Wand2 className="w-3 h-3 text-primary" />
+                           Formel/Template
+                         </label>
+                         <Input
+                           placeholder="z.B. Benutzername@appleid.ds-greiz.de"
+                           value={mapping.formula || ''}
+                           onChange={(e) => updateMapping(index, 'formula', e.target.value)}
+                           className="w-full border-2 focus:border-primary h-10 font-mono bg-primary/5"
+                         />
+                       </div>
+                       
+                       {/* Default Value */}
+                       <div>
+                         <label className="text-sm font-medium text-foreground block mb-2">
+                           Standard-Wert
+                         </label>
+                         <Input
+                           placeholder="Fallback-Wert"
+                           value={mapping.defaultValue || ''}
+                           onChange={(e) => updateMapping(index, 'defaultValue', e.target.value)}
+                           className="w-full border-2 focus:border-primary h-10"
+                         />
+                       </div>
                     </div>
                     
                     {/* Live Preview */}
