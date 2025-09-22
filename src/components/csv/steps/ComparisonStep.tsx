@@ -13,6 +13,7 @@ interface ComparisonStepProps {
   files: CSVFile[];
   onBack: () => void;
   onFinish: () => void;
+  onReturnToHub?: () => void;
 }
 
 interface DiffResult {
@@ -25,7 +26,8 @@ interface DiffResult {
 const ComparisonStep: React.FC<ComparisonStepProps> = ({
   files,
   onBack,
-  onFinish
+  onFinish,
+  onReturnToHub
 }) => {
   const [file1Index, setFile1Index] = useState<number>(0);
   const [file2Index, setFile2Index] = useState<number>(files.length > 1 ? 1 : 0);
@@ -344,9 +346,16 @@ const ComparisonStep: React.FC<ComparisonStepProps> = ({
 
       {/* Navigation */}
       <div className="flex justify-between">
-        <Button variant="outline" onClick={onBack}>
-          Zurück
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onBack}>
+            Zurück
+          </Button>
+          {onReturnToHub && (
+            <Button variant="ghost" onClick={onReturnToHub}>
+              Zurück zum Hub
+            </Button>
+          )}
+        </div>
         
         <Button onClick={onFinish} className="px-8">
           Vergleich abschließen

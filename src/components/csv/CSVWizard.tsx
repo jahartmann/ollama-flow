@@ -12,6 +12,7 @@ import ProcessStep from './steps/ProcessStep';
 import ComparisonStep from './steps/ComparisonStep';
 import TemplateMappingStep from './steps/TemplateMappingStep';
 import PreviewStep from './steps/PreviewStep';
+import FormatConversionStep from './steps/FormatConversionStep';
 
 interface CSVWizardProps {
   onComplete?: (data: CSVFile) => void;
@@ -80,29 +81,25 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
       }
     ];
 
-    if (selectedOperation === 'merge') {
+    if (selectedOperation === 'format_transform') {
+      // Einfache Delimiter-Umwandlung - direkt zur Vorschau
       return [
         ...baseSteps,
         {
-          id: 'process',
-          title: 'Zusammenführung',
-          description: 'CSV-Dateien zusammenführen',
-          icon: <GitCompare className="w-4 h-4" />
-        },
-        {
           id: 'preview',
-          title: 'Vorschau & Export',
-          description: 'Ergebnis prüfen und exportieren',
+          title: 'Format umwandeln',
+          description: 'Delimiter ändern und herunterladen',
           icon: <Eye className="w-4 h-4" />
         }
       ];
-    } else if (selectedOperation === 'format_transform') {
+    } else if (selectedOperation === 'merge') {
+      // Template-basierte Transformation
       return [
         ...baseSteps,
         {
           id: 'mapping',
-          title: 'Template & Mapping',
-          description: 'Felder zuordnen und Live-Vorschau',
+          title: 'Spalten zuordnen',
+          description: 'Template-Mapping und Transformation',
           icon: <LayoutTemplate className="w-4 h-4" />
         },
         {
@@ -117,7 +114,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
         ...baseSteps,
         {
           id: 'compare',
-          title: 'Vergleichen',
+          title: 'Vergleich',
           description: 'Unterschiede zwischen Dateien analysieren',
           icon: <GitCompare className="w-4 h-4" />
         }
@@ -313,17 +310,17 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
     setSelectedOperation(operation);
     markStepCompleted(currentStep);
     
-    if (operation === 'compare') {
-      // Jump directly to comparison step
+    if (operation === 'format_transform') {
+      // CSV umwandeln: direkt zur Format-Umwandlung
       setCurrentStep(2);
     } else if (operation === 'merge') {
-      // For merge, go to process step first
-      goToNextStep();
-    } else if (operation === 'format_transform') {
-      // For format transform, skip process and go directly to mapping
+      // CSV transformieren: Template Mapping
+      setCurrentStep(2);
+    } else if (operation === 'compare') {
+      // Vergleich: direkt zum Vergleich
       setCurrentStep(2);
     }
-  }, [currentStep, goToNextStep, markStepCompleted]);
+  }, [currentStep, markStepCompleted]);
 
   const handleReturnToHub = useCallback(() => {
     // Reset wizard completely
@@ -364,11 +361,14 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
       appliedFilters: filters
     });
     
+    // Go to next step (preview)
+    goToNextStep();
+    
     toast({
       title: "Mapping abgeschlossen",
       description: "Feldmappings und Filter wurden konfiguriert"
     });
-  }, [toast]);
+  }, [goToNextStep, toast]);
 
   // Enhanced export handler with proper formula processing
   const handleExport = useCallback((filename?: string) => {
@@ -533,35 +533,28 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
               />
             )}
 
-            {currentStep === 2 && selectedOperation === 'merge' && (
-              <ProcessStep
+            {/* CSV umwandeln - einfache Delimiter-Umwandlung */}
+            {currentStep === 2 && selectedOperation === 'format_transform' && (
+              <FormatConversionStep
                 files={files}
-                onProcess={handleProcess}
-                onNext={goToNextStep}
                 onBack={goToPreviousStep}
                 onReturnToHub={handleReturnToHub}
               />
             )}
 
-            {currentStep === 2 && selectedOperation === 'format_transform' && (
+            {/* CSV transformieren - Template Mapping */}
+            {currentStep === 2 && selectedOperation === 'merge' && (
               <TemplateMappingStep
                 files={files}
                 processedData={processedData}
                 onMappingComplete={handleMappingComplete}
-                onNext={goToNextStep}
                 onBack={goToPreviousStep}
+                onNext={goToNextStep}
                 onReturnToHub={handleReturnToHub}
               />
             )}
 
-            {currentStep === 2 && selectedOperation === 'compare' && (
-              <ComparisonStep
-                files={files}
-                onFinish={handleFinish}
-                onBack={goToPreviousStep}
-              />
-            )}
-
+            {/* CSV transformieren - Vorschau nach Mapping */}
             {currentStep === 3 && selectedOperation === 'merge' && (
               <PreviewStep
                 files={files}
@@ -569,21 +562,18 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
                 selectedTemplate={selectedTemplate}
                 columnMappings={columnMappings}
                 onExport={handleExport}
-                onFinish={handleFinish}
                 onBack={goToPreviousStep}
+                onFinish={handleFinish}
                 onReturnToHub={handleReturnToHub}
               />
             )}
 
-            {currentStep === 3 && selectedOperation === 'format_transform' && (
-              <PreviewStep
+            {/* Unterschiede erkennen */}
+            {currentStep === 2 && selectedOperation === 'compare' && (
+              <ComparisonStep
                 files={files}
-                processedData={processedData}
-                selectedTemplate={selectedTemplate}
-                columnMappings={columnMappings}
-                onExport={handleExport}
-                onFinish={handleFinish}
                 onBack={goToPreviousStep}
+                onFinish={handleFinish}
                 onReturnToHub={handleReturnToHub}
               />
             )}

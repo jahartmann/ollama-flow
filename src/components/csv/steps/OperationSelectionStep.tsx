@@ -29,34 +29,34 @@ const OperationSelectionStep: React.FC<OperationSelectionStepProps> = ({
     }
   }, [files.length]);
 
-const operations = [
-    {
-      id: 'merge' as const,
-      title: 'CSV zusammenführen',
-      description: 'Mehrere CSV-Dateien zu einer einzigen Datei verbinden',
-      icon: <Edit className="w-6 h-6" />,
-      color: 'bg-blue-500',
-      features: ['Dateien anhängen', 'Spalten verknüpfen', 'Automatisch sortieren'],
-      minFiles: 2,
-      available: files.length >= 2
-    },
+  const operations = [
     {
       id: 'format_transform' as const,
-      title: 'CSV Format umwandeln',
-      description: 'CSV in anderes Spaltenformat konvertieren mit Templates',
-      icon: <LayoutTemplate className="w-6 h-6" />,
+      title: 'CSV umwandeln',
+      description: 'Delimiter ändern (Komma, Semikolon) oder Excel zu CSV',
+      icon: <Edit className="w-6 h-6" />,
       color: 'bg-green-500',
-      features: ['Template Mapping', 'Spalten umbenennen', 'Daten transformieren'],
+      features: ['Komma zu Semikolon', 'Semikolon zu Komma', 'Excel zu CSV'],
+      minFiles: 1,
+      available: files.length >= 1
+    },
+    {
+      id: 'merge' as const,
+      title: 'CSV transformieren', 
+      description: 'CSV-Struktur mit Templates umwandeln und Dateien zusammenführen',
+      icon: <LayoutTemplate className="w-6 h-6" />,
+      color: 'bg-blue-500',
+      features: ['Template-Mapping', 'Spalten zuordnen', 'Dateien zusammenführen'],
       minFiles: 1,
       available: files.length >= 1
     },
     {
       id: 'compare' as const,
-      title: 'CSV Unterschiede erkennen',
-      description: 'Unterschiede zwischen CSV-Dateien analysieren und visualisieren',
+      title: 'Unterschiede erkennen',
+      description: 'Zwei CSV-Dateien vergleichen und Schreibfehler finden',
       icon: <GitCompare className="w-6 h-6" />,
       color: 'bg-purple-500',
-      features: ['Unterschiede finden', 'Änderungen visualisieren', 'Differenz-Reports'],
+      features: ['Visueller Vergleich', 'Schreibfehler erkennen', 'Zeilenweise Unterschiede'],
       minFiles: 2,
       available: files.length >= 2
     }
