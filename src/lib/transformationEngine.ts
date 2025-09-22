@@ -349,11 +349,22 @@ class TransformationEngine {
     }
   }
 
+  // Enhanced template loading with backup
   private loadTemplates(): void {
     try {
-      const stored = localStorage.getItem('csv-templates');
+      let stored = localStorage.getItem('csv-templates');
+      
+      // Fallback to sessionStorage backup if localStorage fails
+      if (!stored) {
+        stored = sessionStorage.getItem('csv-templates-backup');
+      }
+      
       if (stored) {
-        this.templates = JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        this.templates = parsed.map((template: any) => ({
+          ...template,
+          created: template.created ? new Date(template.created) : new Date()
+        }));
       }
     } catch (error) {
       console.error('Failed to load templates:', error);
@@ -363,7 +374,10 @@ class TransformationEngine {
 
   private persistTemplates(): void {
     try {
-      localStorage.setItem('csv-templates', JSON.stringify(this.templates));
+      // Save to both localStorage and sessionStorage for better persistence
+      const templateData = JSON.stringify(this.templates);
+      localStorage.setItem('csv-templates', templateData);
+      sessionStorage.setItem('csv-templates-backup', templateData);
     } catch (error) {
       console.error('Failed to save templates:', error);
     }

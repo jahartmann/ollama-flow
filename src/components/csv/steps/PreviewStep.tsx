@@ -29,7 +29,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
 }) => {
   const sourceData = processedData || (originalFiles.length > 0 ? originalFiles[0] : null);
   
-  // Transform data to match template format using mappings
+  // Transform data using the same logic as TemplateMappingStep
   const finalData = React.useMemo(() => {
     if (!sourceData || !selectedTemplate || columnMappings.length === 0) {
       return sourceData;
@@ -38,13 +38,20 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
     // Create new headers based on template columns
     const templateHeaders = columnMappings.map(mapping => mapping.templateColumn);
     
-    // Transform data rows to match template structure
+    // Transform data rows using enhanced formula processing
     const transformedData = sourceData.data.map(row => {
       return columnMappings.map(mapping => {
-        if (mapping.sourceColumn) {
+        let value = '';
+        
+        // Priority 1: Check if there's a formula
+        if (mapping.formula && mapping.formula.trim()) {
+          value = evaluateFormula(mapping.formula, row, sourceData.headers);
+        }
+        // Priority 2: Use source column mapping
+        else if (mapping.sourceColumn) {
           const sourceIndex = sourceData.headers.indexOf(mapping.sourceColumn);
           if (sourceIndex !== -1) {
-            let value = row[sourceIndex] || '';
+            value = row[sourceIndex] || '';
             
             // Apply transformations
             switch (mapping.transformation) {
@@ -61,11 +68,14 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                 value = value.replace(/\D/g, '').replace(/(\d{4})(\d{3})(\d{4})/, '+49 $1 $2 $3');
                 break;
             }
-            
-            return value;
           }
         }
-        return mapping.defaultValue || '';
+        // Priority 3: Use default value
+        else {
+          value = mapping.defaultValue || '';
+        }
+        
+        return value;
       });
     });
 
@@ -76,6 +86,26 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
       name: `${selectedTemplate.name}_${sourceData.name.replace('.csv', '')}`
     };
   }, [sourceData, selectedTemplate, columnMappings]);
+
+  // Enhanced formula evaluation function (same as TemplateMappingStep)
+  const evaluateFormula = (formula: string, row: string[], headers: string[]): string => {
+    try {
+      let result = formula.trim();
+      
+      // Replace column references with actual values (case-insensitive)
+      headers.forEach((header, index) => {
+        const value = row[index] || '';
+        // Replace direct column name references (for formulas like "Name@domain.de")
+        const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+        result = result.replace(regex, value);
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('Formula evaluation error:', error, { formula, row, headers });
+      return formula; // Return original formula if evaluation fails
+    }
+  };
   const [exportFilename, setExportFilename] = useState(() => {
     const templateName = selectedTemplate?.name || 'processed';
     const baseName = finalData?.name?.replace('.csv', '') || 'data';

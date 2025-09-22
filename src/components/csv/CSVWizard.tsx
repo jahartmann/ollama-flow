@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, GitCompare, LayoutTemplate, Eye, ArrowRight } from 'lucide-react';
 import { CSVFile, CSVTemplate, TemplateColumnMapping, transformationEngine } from '@/lib/transformationEngine';
 import { fileProcessor } from '@/lib/fileProcessor';
+import { WizardCacheManager } from '@/lib/wizardCache';
 import ProgressIndicator, { Step } from './ProgressIndicator';
 import UploadStep from './steps/UploadStep';
 import OperationSelectionStep from './steps/OperationSelectionStep';
@@ -17,7 +18,7 @@ interface CSVWizardProps {
 }
 
 const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
-  // State management
+  // State management with cache restoration
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [files, setFiles] = useState<CSVFile[]>([]);
@@ -27,6 +28,40 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
   const [columnMappings, setColumnMappings] = useState<TemplateColumnMapping[]>([]);
   const [appliedFilters, setAppliedFilters] = useState<any[]>([]);
   const { toast } = useToast();
+
+  // Load cached state on component mount
+  useEffect(() => {
+    const cachedState = WizardCacheManager.loadState();
+    if (cachedState) {
+      setCurrentStep(cachedState.currentStep || 0);
+      setFiles(cachedState.files || []);
+      setSelectedOperation(cachedState.selectedOperation as 'transform' | 'compare' | null);
+      setProcessedData(cachedState.processedData || null);
+      setSelectedTemplate(cachedState.selectedTemplate || null);
+      setColumnMappings(cachedState.columnMappings || []);
+      setAppliedFilters(cachedState.appliedFilters || []);
+      
+      if (cachedState.files && cachedState.files.length > 0) {
+        toast({
+          title: "Session wiederhergestellt",
+          description: "Ihre vorherigen Daten wurden wiederhergestellt"
+        });
+      }
+    }
+  }, [toast]);
+
+  // Save state to cache whenever critical state changes
+  useEffect(() => {
+    WizardCacheManager.saveState({
+      currentStep,
+      files,
+      selectedOperation,
+      processedData,
+      selectedTemplate,
+      columnMappings,
+      appliedFilters
+    });
+  }, [currentStep, files, selectedOperation, processedData, selectedTemplate, columnMappings, appliedFilters]);
 
   // Define wizard steps - dynamic based on operation
   const getSteps = (): Step[] => {
@@ -258,7 +293,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
     });
   }, [toast]);
 
-  // Export handler
+  // Enhanced export handler with proper formula processing
   const handleExport = useCallback((filename?: string) => {
     const dataToExport = processedData || (files.length > 0 ? files[0] : null);
     if (!dataToExport) return;
@@ -267,16 +302,46 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
     let finalData = dataToExport.data;
     let finalHeaders = dataToExport.headers;
 
-    // If we have a template and mappings, transform the data to match template structure
+    // If we have a template and mappings, transform the data using enhanced formula processing
     if (selectedTemplate && columnMappings.length > 0) {
       finalHeaders = columnMappings.map(mapping => mapping.templateColumn);
       finalData = dataToExport.data.map(row => {
         return columnMappings.map(mapping => {
-          if (mapping.sourceColumn) {
-            const sourceIndex = dataToExport.headers.indexOf(mapping.sourceColumn);
-            return sourceIndex !== -1 ? row[sourceIndex] || '' : mapping.defaultValue || '';
+          let value = '';
+          
+          // Priority 1: Check if there's a formula
+          if (mapping.formula && mapping.formula.trim()) {
+            value = evaluateFormula(mapping.formula, row, dataToExport.headers);
           }
-          return mapping.defaultValue || '';
+          // Priority 2: Use source column mapping
+          else if (mapping.sourceColumn) {
+            const sourceIndex = dataToExport.headers.indexOf(mapping.sourceColumn);
+            if (sourceIndex !== -1) {
+              value = row[sourceIndex] || '';
+              
+              // Apply transformations
+              switch (mapping.transformation) {
+                case 'uppercase':
+                  value = value.toUpperCase();
+                  break;
+                case 'lowercase':
+                  value = value.toLowerCase();
+                  break;
+                case 'trim':
+                  value = value.trim();
+                  break;
+                case 'format_phone':
+                  value = value.replace(/\D/g, '').replace(/(\d{4})(\d{3})(\d{4})/, '+49 $1 $2 $3');
+                  break;
+              }
+            }
+          }
+          // Priority 3: Use default value
+          else {
+            value = mapping.defaultValue || '';
+          }
+          
+          return value;
         });
       });
     }
@@ -296,6 +361,26 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
       });
     }
   }, [processedData, files, selectedTemplate, columnMappings, toast]);
+
+  // Enhanced formula evaluation function
+  const evaluateFormula = useCallback((formula: string, row: string[], headers: string[]): string => {
+    try {
+      let result = formula.trim();
+      
+      // Replace column references with actual values (case-insensitive)
+      headers.forEach((header, index) => {
+        const value = row[index] || '';
+        // Replace direct column name references (for formulas like "Name@domain.de")
+        const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+        result = result.replace(regex, value);
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('Formula evaluation error:', error);
+      return formula; // Return original formula if evaluation fails
+    }
+  }, []);
 
   // Navigation helpers
   const markStepCompleted = useCallback((stepIndex: number) => {
@@ -335,7 +420,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
       description: selectedOperation === 'compare' ? "Vergleich erfolgreich beendet" : "CSV-Transformation erfolgreich beendet"
     });
     
-    // Reset wizard
+    // Reset wizard and clear cache
     setCurrentStep(0);
     setCompletedSteps([]);
     setFiles([]);
@@ -344,6 +429,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
     setSelectedTemplate(null);
     setColumnMappings([]);
     setAppliedFilters([]);
+    WizardCacheManager.clearCache();
   }, [processedData, files, onComplete, selectedOperation, toast]);
 
   return (
