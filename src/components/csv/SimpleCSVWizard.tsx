@@ -70,10 +70,27 @@ const SimpleCSVWizard: React.FC<SimpleCSVWizardProps> = ({ onComplete }) => {
 
   // Complete handler
   const handleComplete = (data?: CSVFile) => {
-    if (data && onComplete) {
-      onComplete(data);
+    if (data) {
+      // Auto-export the completed transformation
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename = `transformiert_${timestamp}.csv`;
+      
+      fileProcessor.exportAsCSV(data.data, data.headers, filename);
+      
+      toast({
+        title: "Transformation abgeschlossen",
+        description: `Daten erfolgreich als "${filename}" exportiert`
+      });
+      
+      if (onComplete) {
+        onComplete(data);
+      }
     }
-    handleReturnToHub();
+    
+    // Add delay before returning to hub so user can see the success message
+    setTimeout(() => {
+      handleReturnToHub();
+    }, 2000);
   };
 
   return (
