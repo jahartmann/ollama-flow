@@ -187,7 +187,8 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
   }, [toast]);
 
   // Data processing handler
-  const handleProcess = useCallback((operation: string, options: any) => {
+  const handleProcess = useCallback(async (operation: string, options: any) => {
+    console.log('Debug: Processing operation:', operation, 'with options:', options);
     try {
       let result: CSVFile;
       
@@ -237,40 +238,69 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
             name: `ai_transformed_${files[0].name}`,
             data: options.transformedData || files[0].data // Use AI result or fallback to original
           };
-          
-          // Store AI analysis for later reference
-          toast({
-            title: "KI-Transformation angewendet",
-            description: "Die KI-Analyse wurde erfolgreich auf Ihre Daten angewendet"
-          });
           break;
           
+        case 'format_transform':
+        case 'transform':
         default:
-          result = files[0]; // No processing
+          result = files[0]; // No processing, use original data
       }
       
       setProcessedData(result);
+      
+      // Save processing step state
+      WizardCacheManager.saveState({
+        files,
+        selectedOperation,
+        processedData: result,
+        selectedTemplate,
+        columnMappings,
+        appliedFilters,
+        currentStep: currentStep + 1
+      });
+      
       toast({
         title: "Verarbeitung abgeschlossen",
         description: `Operation "${operation}" erfolgreich ausgeführt`
       });
     } catch (error) {
+      console.error('Processing error:', error);
       toast({
         title: "Verarbeitungsfehler",
         description: error instanceof Error ? error.message : 'Unbekannter Fehler',
         variant: "destructive"
       });
     }
-  }, [files, toast]);
+  }, [files, selectedOperation, selectedTemplate, columnMappings, appliedFilters, currentStep, toast]);
 
   // Operation selection handler
   const handleOperationSelect = useCallback((operation: 'transform' | 'compare') => {
+    console.log('Debug: Operation selected:', operation);
     setSelectedOperation(operation);
-    // Reset step to continue with selected operation
-    setCurrentStep(2);
+    markStepCompleted(currentStep);
+    
+    if (operation === 'compare') {
+      setCurrentStep(5); // Jump directly to comparison step
+    } else {
+      goToNextStep();
+    }
+  }, [currentStep]);
+
+  const handleReturnToHub = useCallback(() => {
+    // Reset wizard completely
+    setCurrentStep(0);
+    setFiles([]);
+    setSelectedOperation(null);
+    setProcessedData(null);
+    setSelectedTemplate(null);
+    setColumnMappings([]);
+    setAppliedFilters([]);
+    setCompletedSteps([]);
+    WizardCacheManager.clearCache();
+    
     toast({
-      title: "Operation ausgewählt",
-      description: `${operation === 'transform' ? 'Transformation' : 'Vergleich'} wurde ausgewählt`
+      title: "Zurück zum Hub",
+      description: "Wizard wurde zurückgesetzt"
     });
   }, [toast]);
 
@@ -496,6 +526,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
               files={files}
               onOperationSelect={handleOperationSelect}
               onBack={goToPreviousStep}
+              onReturnToHub={handleReturnToHub}
             />
           )}
 
@@ -508,6 +539,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
                   onProcess={handleProcess}
                   onNext={goToNextStep}
                   onBack={goToPreviousStep}
+                  onReturnToHub={handleReturnToHub}
                 />
               )}
 

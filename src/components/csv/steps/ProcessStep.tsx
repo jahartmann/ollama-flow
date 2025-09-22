@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowRight, Merge, Split, Filter, Plus, Brain, Sparkles } from 'lucide-react';
+import { ArrowRight, Merge, Split, Filter, Plus, Brain, Sparkles, Home, Zap } from 'lucide-react';
 import { CSVFile } from '@/lib/transformationEngine';
 import { ollamaAPI } from '@/lib/ollamaApi';
 import { useToast } from '@/hooks/use-toast';
@@ -14,19 +14,26 @@ interface ProcessStepProps {
   onProcess: (operation: string, options: any) => void;
   onNext: () => void;
   onBack: () => void;
+  onReturnToHub?: () => void;
 }
 
 const ProcessStep: React.FC<ProcessStepProps> = ({
   files,
   onProcess,
   onNext,
-  onBack
+  onBack,
+  onReturnToHub
 }) => {
-  const [selectedOperation, setSelectedOperation] = useState<string>('');
+  const [selectedOperation, setSelectedOperation] = useState<string>('format_transform');
   const [operationOptions, setOperationOptions] = useState<any>({});
   const [aiPrompt, setAiPrompt] = useState<string>('');
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const { toast } = useToast();
+
+  // Auto-select format_transform as default
+  useEffect(() => {
+    setSelectedOperation('format_transform');
+  }, []);
 
   const operations = [
     {
@@ -167,24 +174,27 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
 
   return (
     <div className="space-y-6">
-      <Card className="shadow-elegant">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="w-5 h-5" />
+      <Card className="glass-card border-primary/20">
+        <CardHeader className="text-center pb-4">
+          <CardTitle className="flex items-center justify-center gap-2 text-2xl">
+            <Zap className="w-6 h-6 text-primary" />
             Datenverarbeitung wählen
           </CardTitle>
+          <p className="text-muted-foreground text-sm">
+            Wählen Sie, wie Ihre Daten transformiert werden sollen
+          </p>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Operation Selection */}
-          <div className="grid gap-4">
+          <div className="grid gap-3">
             {operations.map((operation) => (
               <Card 
                 key={operation.id}
-                className={`cursor-pointer transition-all hover:shadow-md ${
+                className={`cursor-pointer transition-all duration-200 hover:scale-[1.01] ${
                   selectedOperation === operation.id 
-                    ? 'border-primary bg-primary/5' 
+                    ? 'border-primary bg-gradient-subtle shadow-elegant' 
                     : operation.available 
-                      ? 'hover:border-primary/50' 
+                      ? 'hover:border-primary/50 hover:shadow-md' 
                       : 'opacity-50 cursor-not-allowed'
                 }`}
                 onClick={() => operation.available && handleOperationSelect(operation.id)}
@@ -192,27 +202,27 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${
+                      <div className={`p-2.5 rounded-xl transition-colors ${
                         selectedOperation === operation.id 
-                          ? 'bg-primary text-primary-foreground' 
-                          : 'bg-muted'
+                          ? 'bg-primary text-primary-foreground shadow-glow' 
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       }`}>
                         {operation.icon}
                       </div>
-                      <div>
-                        <h3 className="font-medium">{operation.title}</h3>
+                      <div className="flex-1">
+                        <h3 className="font-semibold">{operation.title}</h3>
                         <p className="text-sm text-muted-foreground">{operation.description}</p>
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-2">
                       {!operation.available && (
-                        <Badge variant="outline" className="text-xs">
-                          Min. {operation.minFiles} Dateien benötigt
+                        <Badge variant="destructive" className="text-xs">
+                          Min. {operation.minFiles} Dateien
                         </Badge>
                       )}
                       {selectedOperation === operation.id && (
-                        <Badge className="text-xs">Ausgewählt</Badge>
+                        <Badge className="text-xs bg-primary">✓ Gewählt</Badge>
                       )}
                     </div>
                   </div>
@@ -372,18 +382,28 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
           )}
           
           {/* Navigation */}
-          <div className="flex justify-between pt-4 border-t">
-            <Button variant="outline" onClick={onBack}>
-              Zurück
-            </Button>
+          <div className="flex justify-between items-center pt-6 border-t border-border/50">
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onBack} className="px-4">
+                Zurück
+              </Button>
+              {onReturnToHub && (
+                <Button variant="ghost" onClick={onReturnToHub} className="px-4">
+                  <Home className="w-4 h-4 mr-2" />
+                  Zurück zum Hub
+                </Button>
+              )}
+            </div>
             
             <Button 
               onClick={executeOperation}
               disabled={!selectedOperation || (selectedOperation === 'ai_transform' && isAiProcessing)}
-              className="px-8"
+              className="px-8 glow-button"
+              size="lg"
             >
               {selectedOperation === 'skip' ? 'Überspringen' : 
                selectedOperation === 'ai_transform' && isAiProcessing ? 'KI verarbeitet...' :
+               selectedOperation === 'format_transform' ? 'Weiter zum Template' :
                'Verarbeiten & Weiter'}
             </Button>
           </div>
