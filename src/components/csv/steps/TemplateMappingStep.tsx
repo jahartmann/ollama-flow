@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { LayoutTemplate, Brain, Eye, Filter, Plus, X, Upload } from 'lucide-react';
+import { LayoutTemplate, Wand2, Eye, Filter, Plus, X, Upload, MapPin, Loader2, AlertCircle, CheckCircle2, Mail } from 'lucide-react';
 import { CSVFile, CSVTemplate, TemplateColumnMapping } from '@/lib/transformationEngine';
 import { ollamaAPI } from '@/lib/ollamaApi';
 import { useToast } from '@/hooks/use-toast';
@@ -61,13 +61,13 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
     }
   }, [selectedTemplate]);
 
-  // Preview data with current mappings and filters
+  // Enhanced preview data with simplified formula processing
   const previewData = useMemo(() => {
     if (!sourceData || mappings.length === 0) return [];
 
     let filteredData = [...sourceData.data];
 
-    // Apply filters
+    // Apply filters first
     filters.forEach(filter => {
       const columnIndex = sourceData.headers.indexOf(filter.sourceColumn);
       if (columnIndex === -1) return;
@@ -98,82 +98,34 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
       });
     });
 
-    // Apply mappings
-    return filteredData.slice(0, 10).map(row => {
+    // Apply mappings with enhanced formula processing
+    return filteredData.slice(0, 5).map(row => {
       const mappedRow: string[] = [];
       
       mappings.forEach(mapping => {
         let value = '';
         
-        // If there's a formula, prioritize it over source column
+        // PRIORITY 1: Formula (highest priority)
         if (mapping.formula && mapping.formula.trim()) {
-          try {
-            let formula = mapping.formula.trim();
-            
-            // Handle different formula types
-            if (formula.startsWith('CONCAT(')) {
-              // Extract parameters from CONCAT function
-              const params = formula.slice(7, -1).split(',').map(p => p.trim());
-              value = params.map(param => {
-                let cleanParam = param.replace(/^["']|["']$/g, '');
-                // Replace column references in each parameter
-                sourceData.headers.forEach((header, headerIndex) => {
-                  const headerValue = row[headerIndex] || '';
-                  const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-                  cleanParam = cleanParam.replace(regex, headerValue);
-                });
-                return cleanParam;
-              }).join('');
-            } else if (formula.startsWith('UPPER(')) {
-              let param = formula.slice(6, -1).replace(/^["']|["']$/g, '');
-              // Replace column references
-              sourceData.headers.forEach((header, headerIndex) => {
-                const headerValue = row[headerIndex] || '';
-                const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-                param = param.replace(regex, headerValue);
-              });
-              value = param.toUpperCase();
-            } else if (formula.startsWith('LOWER(')) {
-              let param = formula.slice(6, -1).replace(/^["']|["']$/g, '');
-              // Replace column references
-              sourceData.headers.forEach((header, headerIndex) => {
-                const headerValue = row[headerIndex] || '';
-                const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-                param = param.replace(regex, headerValue);
-              });
-              value = param.toLowerCase();
-            } else {
-              // For direct formulas (like "Benutzername@domain.de"), replace column references
-              value = formula;
-              sourceData.headers.forEach((header, headerIndex) => {
-                const headerValue = row[headerIndex] || '';
-                // Create a more specific regex that matches the column name as a whole word
-                // but not as part of email addresses or other text
-                const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b(?!@)`, 'gi');
-                value = value.replace(regex, headerValue);
-              });
-            }
-            
-            // Debug logging
-            console.log('Formula processing:', {
-              original: mapping.formula,
-              processed: value,
-              sourceData: sourceData.headers,
-              currentRow: row
-            });
-            
-          } catch (error) {
-            console.error('Formula error:', error);
-            value = mapping.defaultValue || '';
-          }
+          let formulaResult = mapping.formula.trim();
+          
+          // Replace column references with actual values
+          sourceData.headers.forEach((header, headerIndex) => {
+            const cellValue = row[headerIndex] || '';
+            // Use word boundary to avoid partial matches
+            const regex = new RegExp(`\\b${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+            formulaResult = formulaResult.replace(regex, cellValue);
+          });
+          
+          value = formulaResult;
         }
-        // Otherwise use source column with transformations
-        else if (mapping.sourceColumn) {
+        // PRIORITY 2: Direct column mapping
+        else if (mapping.sourceColumn && mapping.sourceColumn !== 'none' && mapping.sourceColumn !== '') {
           const sourceIndex = sourceData.headers.indexOf(mapping.sourceColumn);
           if (sourceIndex !== -1) {
             value = row[sourceIndex] || '';
             
-            // Apply standard transformations
+            // Apply transformations
             switch (mapping.transformation) {
               case 'uppercase':
                 value = value.toUpperCase();
@@ -188,11 +140,11 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
                 value = value.replace(/\D/g, '').replace(/(\d{4})(\d{3})(\d{4})/, '+49 $1 $2 $3');
                 break;
             }
-          } else {
-            value = mapping.defaultValue || '';
           }
-        } else {
-          value = mapping.defaultValue || '';
+        }
+        // PRIORITY 3: Default value
+        else if (mapping.defaultValue) {
+          value = mapping.defaultValue;
         }
         
         mappedRow.push(value);
@@ -349,231 +301,255 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
   const isValid = selectedTemplate && mappings.some(m => m.sourceColumn || m.defaultValue || m.formula);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Step Header */}
+      <div className="text-center space-y-2">
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+          Template-Mapping
+        </h2>
+        <p className="text-muted-foreground">
+          Ordnen Sie Ihre CSV-Spalten dem gewählten Template zu
+        </p>
+      </div>
+
       {/* Template Selection */}
-      <Card className="shadow-elegant">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card className="shadow-elegant border-l-4 border-l-primary/50">
+        <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent">
+          <CardTitle className="flex items-center gap-2 text-primary">
             <LayoutTemplate className="w-5 h-5" />
-            Template & Mapping
+            Template-Auswahl
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium">Ziel-Template auswählen</label>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setShowTemplateUpload(true)}
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Neues Template
-              </Button>
+        <CardContent className="pt-6">
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <Select onValueChange={handleTemplateSelect} value={selectedTemplate?.id || ""}>
+                <SelectTrigger className="h-12 border-2 focus:border-primary">
+                  <SelectValue placeholder="Wählen Sie ein Template aus..." />
+                </SelectTrigger>
+                <SelectContent className="bg-background border-2 shadow-xl z-50">
+                  {availableTemplates.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground">
+                      <AlertCircle className="w-8 h-8 mx-auto mb-2 text-muted-foreground/50" />
+                      <p className="font-medium">Keine Templates verfügbar</p>
+                      <p className="text-xs">Erstellen Sie ein neues Template</p>
+                    </div>
+                  ) : (
+                    availableTemplates.map(template => (
+                      <SelectItem key={template.id} value={template.id} className="p-3">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-primary" />
+                          <div>
+                            <div className="font-medium">{template.name}</div>
+                            <div className="text-sm text-muted-foreground">{template.description}</div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
-            <Select onValueChange={handleTemplateSelect} value={selectedTemplate?.id || ""}>
-              <SelectTrigger>
-                <SelectValue placeholder="Template wählen oder neues erstellen..." />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border z-50">
-                {availableTemplates.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    <p>Keine Templates verfügbar</p>
-                    <p className="text-xs">Erstellen Sie ein neues Template</p>
-                  </div>
-                ) : (
-                  availableTemplates.map(template => (
-                    <SelectItem key={template.id} value={template.id}>
-                      <div>
-                        <div className="font-medium">{template.name}</div>
-                        <div className="text-sm text-muted-foreground">{template.description}</div>
-                      </div>
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Auto-Mapping Button */}
-          <div className="flex justify-end">
+            
             <Button 
-              variant="secondary" 
-              size="sm"
-              onClick={handleAiMapping}
-              disabled={!sourceData || !selectedTemplate || isAiProcessing}
-              className="text-xs"
+              variant="outline" 
+              size="lg"
+              onClick={() => setShowTemplateUpload(true)}
+              className="border-2 border-dashed border-primary/30 hover:border-primary/60"
             >
-              <Brain className="w-3 h-3 mr-1" />
-              {isAiProcessing ? 'KI arbeitet...' : 'Auto-Mapping'}
+              <Upload className="w-4 h-4 mr-2" />
+              Neues Template
             </Button>
           </div>
+
+          {selectedTemplate && (
+            <div className="mt-6 p-4 bg-primary/10 rounded-lg border border-primary/20">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="w-5 h-5 text-primary" />
+                <h4 className="font-semibold text-primary">Template gewählt: {selectedTemplate.name}</h4>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">{selectedTemplate.description}</p>
+              <div className="flex flex-wrap gap-2">
+                {selectedTemplate.columns?.map(col => (
+                  <Badge key={col.name} variant="secondary" className="text-xs">
+                    {col.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Simplified Column Mappings */}
-      {selectedTemplate && selectedTemplate.columns && (
-        <Card className="shadow-elegant">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <LayoutTemplate className="w-5 h-5" />
-              Feldmappings ({mappings.length} Felder)
+      {/* Field Mappings */}
+      {selectedTemplate && (
+        <Card className="shadow-elegant border-l-4 border-l-blue-500">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-transparent">
+            <CardTitle className="flex items-center gap-2 text-blue-700">
+              <MapPin className="w-5 h-5" />
+              Feld-Zuordnung ({mappings.length} Felder)
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAiMapping}
+                disabled={isAiProcessing || !sourceData}
+                className="ml-auto border-blue-300 hover:bg-blue-50"
+              >
+                {isAiProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    KI arbeitet...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-4 h-4 mr-1" />
+                    KI-Mapping
+                  </>
+                )}
+              </Button>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {mappings.map((mapping, index) => (
-                <div key={index} className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-3 border rounded-lg bg-card/30">
-                  <div>
-                    <label className="text-sm font-medium block mb-1">
-                      {mapping.templateColumn}
-                    </label>
-                    <Select 
-                      value={mapping.sourceColumn || 'none'} 
-                      onValueChange={(value) => updateMapping(index, 'sourceColumn', value)}
-                    >
-                      <SelectTrigger className="w-full h-8">
-                        <SelectValue placeholder="Quell-Spalte wählen..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover border z-50">
-                        <SelectItem value="none">Keine Zuordnung</SelectItem>
-                        {sourceData?.headers.map(header => (
-                          <SelectItem key={header} value={header}>
-                            {header}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium block mb-1">
-                      Formel (optional)
-                    </label>
-                    <Input
-                      placeholder="z.B. Name@domain.de oder CONCAT(Name,@domain.de)"
-                      value={mapping.formula || ''}
-                      onChange={(e) => updateMapping(index, 'formula', e.target.value)}
-                      className="w-full h-8 text-sm"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium block mb-1">
-                      Standard-Wert
-                    </label>
-                    <Input
-                      placeholder="Fallback-Wert"
-                      value={mapping.defaultValue || ''}
-                      onChange={(e) => updateMapping(index, 'defaultValue', e.target.value)}
-                      className="w-full h-8 text-sm"
-                    />
+          <CardContent className="pt-6">
+            {/* Help Section */}
+            <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <Mail className="w-6 h-6 text-green-600 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-green-800 mb-2">💡 E-Mail-Erstellung Anleitung</h4>
+                  <div className="space-y-2 text-sm text-green-700">
+                    <p><strong>Für E-Mail-Adressen:</strong> Verwenden Sie die Formel-Funktion</p>
+                    <div className="bg-white p-3 rounded border-l-4 border-green-400">
+                      <div className="font-mono text-sm">
+                        <div className="text-green-600 mb-1">✓ Richtig:</div>
+                        <div className="bg-green-50 p-2 rounded">
+                          <code>Benutzername@appleid.ds-greiz.de</code>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-green-600">
+                      Der Spaltenname wird automatisch durch den tatsächlichen Wert ersetzt!
+                    </p>
                   </div>
                 </div>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              {mappings.map((mapping, index) => (
+                <Card key={index} className="border-2 hover:border-primary/40 transition-all duration-200 bg-gradient-to-r from-white to-primary/5">
+                  <CardContent className="p-5">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
+                      {/* Template Field */}
+                      <div>
+                        <label className="text-sm font-semibold text-primary block mb-2 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          Ziel-Feld
+                        </label>
+                        <div className="p-3 bg-primary/10 rounded-lg text-center border-2 border-dashed border-primary/30">
+                          <span className="font-semibold text-primary">{mapping.templateColumn}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Source Column */}
+                      <div>
+                        <label className="text-sm font-medium block mb-2">
+                          Quell-Spalte
+                        </label>
+                        <Select 
+                          value={mapping.sourceColumn || 'none'} 
+                          onValueChange={(value) => updateMapping(index, 'sourceColumn', value === 'none' ? '' : value)}
+                        >
+                          <SelectTrigger className="w-full bg-background border-2 h-10">
+                            <SelectValue placeholder="Spalte wählen..." />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border-2 shadow-lg z-50">
+                            <SelectItem value="none" className="text-muted-foreground">
+                              Keine direkte Zuordnung
+                            </SelectItem>
+                            {sourceData?.headers.map(header => (
+                              <SelectItem key={header} value={header}>
+                                {header}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {/* Formula */}
+                      <div>
+                        <label className="text-sm font-medium block mb-2 flex items-center gap-1">
+                          <Wand2 className="w-3 h-3" />
+                          Formel/Template
+                        </label>
+                        <Input
+                          placeholder="z.B. Benutzername@appleid.ds-greiz.de"
+                          value={mapping.formula || ''}
+                          onChange={(e) => updateMapping(index, 'formula', e.target.value)}
+                          className="w-full border-2 focus:border-blue-400 h-10"
+                        />
+                      </div>
+                      
+                      {/* Default Value */}
+                      <div>
+                        <label className="text-sm font-medium block mb-2">
+                          Standard-Wert
+                        </label>
+                        <Input
+                          placeholder="Fallback-Wert"
+                          value={mapping.defaultValue || ''}
+                          onChange={(e) => updateMapping(index, 'defaultValue', e.target.value)}
+                          className="w-full border-2 focus:border-primary h-10"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Live Preview */}
+                    <div className="mt-4 p-3 bg-muted/20 rounded-lg border border-muted">
+                      <span className="text-xs text-muted-foreground uppercase tracking-wide">Live-Vorschau:</span>
+                      <div className="font-mono text-sm mt-1 font-medium">
+                        {(() => {
+                          if (mapping.formula && mapping.formula.trim()) {
+                            let preview = mapping.formula.trim();
+                            if (sourceData?.headers) {
+                              sourceData.headers.forEach((header) => {
+                                preview = preview.replace(new RegExp(`\\b${header}\\b`, 'g'), `[${header}]`);
+                              });
+                            }
+                            return <span className="text-blue-600">{preview}</span>;
+                          } else if (mapping.sourceColumn && mapping.sourceColumn !== 'none' && mapping.sourceColumn !== '') {
+                            return <span className="text-green-600">[{mapping.sourceColumn}]</span>;
+                          } else if (mapping.defaultValue) {
+                            return <span className="text-orange-600">{mapping.defaultValue}</span>;
+                          } else {
+                            return <span className="text-muted-foreground">(leer)</span>;
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Data Filters */}
-      <Card className="shadow-elegant">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="w-5 h-5" />
-            Datenfilter ({filters.length})
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addFilter}
-              className="ml-auto"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Filter hinzufügen
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filters.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">
-              Keine Filter konfiguriert. Klicken Sie "Filter hinzufügen" um Daten zu filtern.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {filters.map((filter) => (
-                <div key={filter.id} className="flex items-center gap-3 p-3 border rounded-lg">
-                  <Select 
-                    value={filter.sourceColumn} 
-                    onValueChange={(value) => updateFilter(filter.id, 'sourceColumn', value)}
-                  >
-                    <SelectTrigger className="w-[150px]">
-                      <SelectValue placeholder="Spalte..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover border z-50">
-                      {sourceData?.headers.map(header => (
-                        <SelectItem key={header} value={header}>
-                          {header}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  
-                  <Select 
-                    value={filter.condition} 
-                    onValueChange={(value) => updateFilter(filter.id, 'condition', value as any)}
-                  >
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover border z-50">
-                      <SelectItem value="contains">enthält</SelectItem>
-                      <SelectItem value="equals">gleich</SelectItem>
-                      <SelectItem value="starts_with">beginnt mit</SelectItem>
-                      <SelectItem value="ends_with">endet mit</SelectItem>
-                      <SelectItem value="not_empty">nicht leer</SelectItem>
-                      <SelectItem value="empty">leer</SelectItem>
-                      <SelectItem value="greater_than">größer als</SelectItem>
-                      <SelectItem value="less_than">kleiner als</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <Input
-                    placeholder="Wert..."
-                    value={filter.value}
-                    onChange={(e) => updateFilter(filter.id, 'value', e.target.value)}
-                    className="flex-1"
-                  />
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeFilter(filter.id)}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Live Preview */}
-      {previewData.length > 0 && (
-        <Card className="shadow-elegant">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+      {/* Data Preview */}
+      {selectedTemplate && previewData.length > 0 && (
+        <Card className="shadow-elegant border-l-4 border-l-green-500">
+          <CardHeader className="bg-gradient-to-r from-green-50 to-transparent">
+            <CardTitle className="flex items-center gap-2 text-green-700">
               <Eye className="w-5 h-5" />
-              Live-Vorschau (erste 10 Zeilen)
+              Datenvorschau (erste 5 Zeilen)
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
+              <table className="w-full border-collapse">
                 <thead>
-                  <tr className="border-b">
+                  <tr className="bg-primary/10">
                     {mappings.map((mapping, index) => (
-                      <th key={index} className="text-left p-2 font-medium">
+                      <th key={index} className="border border-primary/20 p-3 text-left text-sm font-semibold text-primary">
                         {mapping.templateColumn}
                       </th>
                     ))}
@@ -581,10 +557,10 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
                 </thead>
                 <tbody>
                   {previewData.map((row, rowIndex) => (
-                    <tr key={rowIndex} className="border-b hover:bg-muted/30">
+                    <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-muted/30'}>
                       {row.map((cell, cellIndex) => (
-                        <td key={cellIndex} className="p-2 max-w-[200px] truncate">
-                          {cell || <span className="text-muted-foreground">-</span>}
+                        <td key={cellIndex} className="border border-muted p-3 text-sm font-mono">
+                          {cell || <span className="text-muted-foreground italic">leer</span>}
                         </td>
                       ))}
                     </tr>
@@ -596,34 +572,47 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
         </Card>
       )}
 
+      {/* Navigation */}
+      <div className="flex justify-between items-center pt-6 border-t">
+        <Button variant="outline" onClick={onBack} size="lg">
+          Zurück
+        </Button>
+        
+        <div className="flex items-center gap-3">
+          {isValid ? (
+            <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
+              <CheckCircle2 className="w-3 h-3 mr-1" />
+              Bereit für nächsten Schritt
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-300">
+              <AlertCircle className="w-3 h-3 mr-1" />
+              Template und Mappings erforderlich
+            </Badge>
+          )}
+          
+          <Button 
+            onClick={handleNext} 
+            disabled={!isValid}
+            size="lg"
+            className="min-w-[120px]"
+          >
+            Weiter
+          </Button>
+        </div>
+      </div>
+
       {/* Template Upload Modal */}
       {showTemplateUpload && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
-          <div className="bg-background rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto border shadow-lg">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <TemplateUpload
-              onTemplateCreate={handleTemplateCreate}
               onClose={() => setShowTemplateUpload(false)}
+              onTemplateCreate={handleTemplateCreate}
             />
           </div>
         </div>
       )}
-
-      {/* Navigation */}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onBack}>
-          Zurück
-        </Button>
-        <div className="flex items-center gap-2">
-          {isValid && (
-            <Badge variant="outline" className="text-green-600 border-green-600">
-              ✓ Bereit
-            </Badge>
-          )}
-          <Button onClick={handleNext} disabled={!isValid}>
-            Weiter zur Vorschau
-          </Button>
-        </div>
-      </div>
     </div>
   );
 };
