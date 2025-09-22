@@ -190,13 +190,13 @@ const TemplateTransformer: React.FC<TemplateTransformerProps> = ({
                   <label className="text-sm font-medium mb-2 block">Quell-Spalte</label>
                   <Select
                     value={mapping.sourceColumn}
-                    onValueChange={(value) => updateMapping(index, 'sourceColumn', value)}
+                    onValueChange={(value) => updateMapping(index, 'sourceColumn', value === 'none' ? '' : value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Spalte wählen..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Keine</SelectItem>
+                      <SelectItem value="none">Keine</SelectItem>
                       {sourceFile?.headers.map((header) => (
                         <SelectItem key={header} value={header}>
                           {header}
