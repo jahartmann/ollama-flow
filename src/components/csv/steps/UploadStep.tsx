@@ -14,7 +14,8 @@ interface UploadStepProps {
   onFileUpload: (files: File[]) => void;
   onRemoveFile: (fileId: string) => void;
   onPreviewFile: (file: CSVFile) => void;
-  onNext: () => void;
+  onNext?: () => void;
+  onReturnToHub?: () => void;
 }
 
 const UploadStep: React.FC<UploadStepProps> = ({
@@ -22,7 +23,8 @@ const UploadStep: React.FC<UploadStepProps> = ({
   onFileUpload,
   onRemoveFile,
   onPreviewFile,
-  onNext
+  onNext,
+  onReturnToHub
 }) => {
   const [previewFile, setPreviewFile] = useState<CSVFile | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);

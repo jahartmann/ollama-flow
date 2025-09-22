@@ -24,104 +24,39 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
   onBack,
   onReturnToHub
 }) => {
-  const [selectedOperation, setSelectedOperation] = useState<string>('format_transform');
+  const [selectedOperation, setSelectedOperation] = useState<string>('merge');
   const [operationOptions, setOperationOptions] = useState<any>({});
   const [aiPrompt, setAiPrompt] = useState<string>('');
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const { toast } = useToast();
 
-  // Auto-select format_transform as default
+  // Auto-select merge as default (only operation available in simplified version)
   useEffect(() => {
-    setSelectedOperation('format_transform');
+    setSelectedOperation('merge');
   }, []);
 
   const operations = [
     {
       id: 'merge',
       title: 'Dateien zusammenführen',
-      description: 'Verbindet mehrere CSV-Dateien zu einer einzigen Datei',
+      description: 'Verbindet alle CSV-Dateien zu einer einzigen Datei durch Anhängen',
       icon: <Merge className="w-5 h-5" />,
       minFiles: 2,
       available: files.length >= 2
-    },
-    {
-      id: 'filter',
-      title: 'Daten filtern',
-      description: 'Filtert Zeilen basierend auf Kriterien',
-      icon: <Filter className="w-5 h-5" />,
-      minFiles: 1,
-      available: files.length >= 1
-    },
-    {
-      id: 'format_transform',
-      title: 'In anderes Format umwandeln',
-      description: 'CSV in ein anderes Spaltenformat konvertieren',
-      icon: <ArrowRight className="w-5 h-5" />,
-      minFiles: 1,
-      available: files.length >= 1
-    },
-    {
-      id: 'transform',
-      title: 'Spalten transformieren',
-      description: 'Ändern, hinzufügen oder entfernen von Spalten',
-      icon: <Plus className="w-5 h-5" />,
-      minFiles: 1,
-      available: files.length >= 1
-    },
-    {
-      id: 'ai_transform',
-      title: 'KI-gesteuerte Transformation',
-      description: 'Lassen Sie die KI Ihre Daten intelligent transformieren',
-      icon: <Brain className="w-5 h-5" />,
-      minFiles: 1,
-      available: files.length >= 1
-    },
-    {
-      id: 'skip',
-      title: 'Ohne Verarbeitung fortfahren',
-      description: 'Direkt zum Template-Schritt',
-      icon: <ArrowRight className="w-5 h-5" />,
-      minFiles: 1,
-      available: files.length >= 1
     }
   ];
 
   const handleOperationSelect = (operationId: string) => {
     setSelectedOperation(operationId);
-    
-    if (operationId === 'skip') {
-      onNext();
-      return;
-    }
-    
-    // Set default options based on operation
-    switch (operationId) {
-      case 'merge':
-        setOperationOptions({ method: 'append' });
-        break;
-      case 'filter':
-        setOperationOptions({ column: '', condition: 'contains', value: '' });
-        break;
-      case 'format_transform':
-        // Skip processing, go directly to template mapping
-        onNext();
-        return;
-      case 'transform':
-        setOperationOptions({ transformations: [] });
-        break;
-      case 'ai_transform':
-        setOperationOptions({ prompt: '', analysis: null });
-        break;
+    // Set default options for merge (only available operation)
+    if (operationId === 'merge') {
+      setOperationOptions({ method: 'append' });
     }
   };
 
   const executeOperation = async () => {
-    if (selectedOperation && selectedOperation !== 'skip') {
-      if (selectedOperation === 'ai_transform') {
-        await handleAiTransformation();
-      } else {
-        onProcess(selectedOperation, operationOptions);
-      }
+    if (selectedOperation === 'merge') {
+      onProcess(selectedOperation, operationOptions);
     }
     onNext();
   };
@@ -231,152 +166,25 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
             ))}
           </div>
 
-          {/* Operation Options */}
-          {selectedOperation && selectedOperation !== 'skip' && (
+          {/* Operation Description */}
+          {selectedOperation === 'merge' && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Optionen konfigurieren</CardTitle>
+                <CardTitle className="text-base">Zusammenführung</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {selectedOperation === 'merge' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Zusammenführungs-Methode</label>
-                      <Select 
-                        value={operationOptions.method} 
-                        onValueChange={(value) => setOperationOptions(prev => ({ ...prev, method: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Methode auswählen" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="append">Anhängen (alle Zeilen)</SelectItem>
-                          <SelectItem value="join">Verknüpfen (gemeinsame Spalte)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                <p className="text-sm text-muted-foreground">
+                  Alle {files.length} CSV-Dateien werden zu einer einzigen Datei zusammengeführt, 
+                  indem alle Zeilen angehängt werden. Die erste Datei bestimmt die Spaltenreihenfolge.
+                </p>
+                <div className="bg-muted/50 p-3 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground mb-2">Dateien:</div>
+                  {files.map((file, index) => (
+                    <div key={file.id} className="text-sm">
+                      {index + 1}. {file.name} ({file.data.length} Zeilen)
                     </div>
-                    
-                    {operationOptions.method === 'join' && (
-                      <div>
-                        <label className="text-sm font-medium mb-2 block">Verknüpfungs-Spalte</label>
-                        <Select 
-                          value={operationOptions.joinColumn || ''} 
-                          onValueChange={(value) => setOperationOptions(prev => ({ ...prev, joinColumn: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Spalte auswählen" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {files[0]?.headers.map(header => (
-                              <SelectItem key={header} value={header}>{header}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {selectedOperation === 'filter' && (
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Spalte</label>
-                      <Select 
-                        value={operationOptions.column} 
-                        onValueChange={(value) => setOperationOptions(prev => ({ ...prev, column: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Spalte" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {files[0]?.headers.map(header => (
-                            <SelectItem key={header} value={header}>{header}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Bedingung</label>
-                      <Select 
-                        value={operationOptions.condition} 
-                        onValueChange={(value) => setOperationOptions(prev => ({ ...prev, condition: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Bedingung" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="contains">Enthält</SelectItem>
-                          <SelectItem value="equals">Ist gleich</SelectItem>
-                          <SelectItem value="starts_with">Beginnt mit</SelectItem>
-                          <SelectItem value="not_empty">Nicht leer</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Wert</label>
-                      <input 
-                        type="text"
-                        className="w-full px-3 py-2 border rounded-md text-sm"
-                        value={operationOptions.value}
-                        onChange={(e) => setOperationOptions(prev => ({ ...prev, value: e.target.value }))}
-                        placeholder="Filterwert"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {selectedOperation === 'ai_transform' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block flex items-center gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        KI-Transformationsanweisung
-                      </label>
-                      <Textarea
-                        placeholder="Beschreiben Sie, wie die Daten transformiert werden sollen... z.B.: 'Erstelle eine neue Spalte Email aus Vorname und Nachname', 'Filtere alle Einträge mit Status aktiv', 'Bereinige die Telefonnummern'"
-                        value={aiPrompt}
-                        onChange={(e) => setAiPrompt(e.target.value)}
-                        className="min-h-[100px]"
-                      />
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Die KI analysiert Ihre Daten und führt die gewünschten Transformationen durch.
-                      </p>
-                    </div>
-
-                    {operationOptions.analysis && (
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <h4 className="font-medium mb-2 flex items-center gap-2">
-                          <Brain className="w-4 h-4" />
-                          KI-Analyse
-                        </h4>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                          {operationOptions.analysis}
-                        </p>
-                      </div>
-                    )}
-
-                    <Button
-                      onClick={handleAiTransformation}
-                      disabled={!aiPrompt.trim() || isAiProcessing}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      {isAiProcessing ? (
-                        <>
-                          <Brain className="w-4 h-4 mr-2 animate-pulse" />
-                          KI verarbeitet...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          KI-Analyse starten
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
+                  ))}
+                </div>
               </CardContent>
             </Card>
           )}
@@ -397,14 +205,11 @@ const ProcessStep: React.FC<ProcessStepProps> = ({
             
             <Button 
               onClick={executeOperation}
-              disabled={!selectedOperation || (selectedOperation === 'ai_transform' && isAiProcessing)}
+              disabled={!selectedOperation}
               className="px-8 glow-button"
               size="lg"
             >
-              {selectedOperation === 'skip' ? 'Überspringen' : 
-               selectedOperation === 'ai_transform' && isAiProcessing ? 'KI verarbeitet...' :
-               selectedOperation === 'format_transform' ? 'Weiter zum Template' :
-               'Verarbeiten & Weiter'}
+              Dateien zusammenführen & Weiter
             </Button>
           </div>
         </CardContent>

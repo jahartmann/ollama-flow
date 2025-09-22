@@ -22,7 +22,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [files, setFiles] = useState<CSVFile[]>([]);
-  const [selectedOperation, setSelectedOperation] = useState<'transform' | 'compare' | null>(null);
+  const [selectedOperation, setSelectedOperation] = useState<'merge' | 'format_transform' | 'compare' | null>(null);
   const [processedData, setProcessedData] = useState<CSVFile | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<CSVTemplate | null>(null);
   const [columnMappings, setColumnMappings] = useState<TemplateColumnMapping[]>([]);
@@ -35,7 +35,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
     if (cachedState) {
       setCurrentStep(cachedState.currentStep || 0);
       setFiles(cachedState.files || []);
-      setSelectedOperation(cachedState.selectedOperation as 'transform' | 'compare' | null);
+      setSelectedOperation(cachedState.selectedOperation as 'merge' | 'format_transform' | 'compare' | null);
       setProcessedData(cachedState.processedData || null);
       setSelectedTemplate(cachedState.selectedTemplate || null);
       setColumnMappings(cachedState.columnMappings || []);
@@ -75,20 +75,30 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
       {
         id: 'operation',
         title: 'Operation wählen',
-        description: 'Zwischen Bearbeitung und Vergleich wählen',
+        description: 'Zwischen den 3 Grundfunktionen wählen',
         icon: <ArrowRight className="w-4 h-4" />
       }
     ];
 
-    if (selectedOperation === 'transform') {
+    if (selectedOperation === 'merge') {
       return [
         ...baseSteps,
         {
           id: 'process',
-          title: 'Verarbeitung',
-          description: 'Daten verarbeiten und transformieren',
+          title: 'Zusammenführung',
+          description: 'CSV-Dateien zusammenführen',
           icon: <GitCompare className="w-4 h-4" />
         },
+        {
+          id: 'preview',
+          title: 'Vorschau & Export',
+          description: 'Ergebnis prüfen und exportieren',
+          icon: <Eye className="w-4 h-4" />
+        }
+      ];
+    } else if (selectedOperation === 'format_transform') {
+      return [
+        ...baseSteps,
         {
           id: 'mapping',
           title: 'Template & Mapping',
@@ -194,13 +204,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
       
       switch (operation) {
         case 'merge':
-          if (options.method === 'append') {
-            result = transformationEngine.mergeFiles(files, 'append');
-          } else if (options.method === 'join') {
-            result = transformationEngine.mergeFiles(files, 'join', options.joinColumn);
-          } else {
-            throw new Error('Unknown merge method');
-          }
+          result = transformationEngine.mergeFiles(files, 'append');
           break;
           
         case 'filter':
@@ -273,18 +277,53 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
     }
   }, [files, selectedOperation, selectedTemplate, columnMappings, appliedFilters, currentStep, toast]);
 
+  // Navigation helpers
+  const markStepCompleted = useCallback((stepIndex: number) => {
+    setCompletedSteps(prev => {
+      if (!prev.includes(stepIndex)) {
+        return [...prev, stepIndex];
+      }
+      return prev;
+    });
+  }, []);
+
+  const goToStep = useCallback((stepIndex: number) => {
+    setCurrentStep(stepIndex);
+  }, []);
+
+  const goToNextStep = useCallback(() => {
+    console.log('goToNextStep called:', { currentStep, stepsLength: steps.length });
+    markStepCompleted(currentStep);
+    if (currentStep < steps.length - 1) {
+      const nextStep = currentStep + 1;
+      console.log('Moving to step:', nextStep);
+      setCurrentStep(nextStep);
+    }
+  }, [currentStep, markStepCompleted, steps.length]);
+
+  const goToPreviousStep = useCallback(() => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  }, [currentStep]);
+
   // Operation selection handler
-  const handleOperationSelect = useCallback((operation: 'transform' | 'compare') => {
+  const handleOperationSelect = useCallback((operation: 'merge' | 'format_transform' | 'compare') => {
     console.log('Debug: Operation selected:', operation);
     setSelectedOperation(operation);
     markStepCompleted(currentStep);
     
     if (operation === 'compare') {
-      setCurrentStep(5); // Jump directly to comparison step
-    } else {
+      // Jump directly to comparison step
+      setCurrentStep(2);
+    } else if (operation === 'merge') {
+      // For merge, go to process step first
       goToNextStep();
+    } else if (operation === 'format_transform') {
+      // For format transform, skip process and go directly to mapping
+      setCurrentStep(2);
     }
-  }, [currentStep]);
+  }, [currentStep, goToNextStep, markStepCompleted]);
 
   const handleReturnToHub = useCallback(() => {
     // Reset wizard completely
@@ -420,36 +459,6 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
     }
   }, []);
 
-  // Navigation helpers
-  const markStepCompleted = useCallback((stepIndex: number) => {
-    setCompletedSteps(prev => {
-      if (!prev.includes(stepIndex)) {
-        return [...prev, stepIndex];
-      }
-      return prev;
-    });
-  }, []);
-
-  const goToStep = useCallback((stepIndex: number) => {
-    setCurrentStep(stepIndex);
-  }, []);
-
-  const goToNextStep = useCallback(() => {
-    console.log('goToNextStep called:', { currentStep, stepsLength: steps.length });
-    markStepCompleted(currentStep);
-    if (currentStep < steps.length - 1) {
-      const nextStep = currentStep + 1;
-      console.log('Moving to step:', nextStep);
-      setCurrentStep(nextStep);
-    }
-  }, [currentStep, markStepCompleted, steps.length]);
-
-  const goToPreviousStep = useCallback(() => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  }, [currentStep]);
-
   const handleFinish = useCallback(() => {
     const finalData = processedData || (files.length > 0 ? files[0] : null);
     if (finalData && onComplete) {
@@ -483,7 +492,7 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
               CSV Wizard
             </h1>
             <p className="text-lg text-muted-foreground mt-2">
-              Transformieren Sie Ihre Daten mit Leichtigkeit
+              3 Grundfunktionen: Zusammenführen • Format umwandeln • Unterschiede erkennen
             </p>
           </div>
         </div>
@@ -491,93 +500,93 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
           {/* Modern Progress Sidebar */}
           <div className="xl:col-span-1">
-            <div className="glass-card sticky top-8 p-6">
-              <ProgressIndicator
-                steps={steps}
-                currentStep={currentStep}
-                completedSteps={completedSteps}
-              />
-            </div>
+            <Card className="glass-card sticky top-4">
+              <CardContent className="p-6">
+                <ProgressIndicator 
+                  steps={steps} 
+                  currentStep={currentStep} 
+                  completedSteps={completedSteps}
+                />
+              </CardContent>
+            </Card>
           </div>
 
           {/* Main Content Area */}
           <div className="xl:col-span-4">
-            <div className="data-card p-8 min-h-[600px]">
-              
-              {/* Debug Info */}
-              <div className="mb-4 p-3 bg-muted/20 rounded text-xs text-muted-foreground">
-                Debug: Step {currentStep} / {steps.length - 1} | Operation: {selectedOperation} | Files: {files.length} | 
-                ProcessedData: {processedData ? 'Yes' : 'No'} | Template: {selectedTemplate ? selectedTemplate.name : 'None'} | 
-                Mappings: {columnMappings.length}
-              </div>
-              
-          {currentStep === 0 && (
-            <UploadStep
-              files={files}
-              onFileUpload={handleFileUpload}
-              onRemoveFile={handleRemoveFile}
-              onPreviewFile={handlePreviewFile}
-              onNext={goToNextStep}
-            />
-          )}
+            {currentStep === 0 && (
+              <UploadStep
+                files={files}
+                onFileUpload={handleFileUpload}
+                onRemoveFile={handleRemoveFile}
+                onPreviewFile={handlePreviewFile}
+                onNext={files.length > 0 ? goToNextStep : undefined}
+                onReturnToHub={handleReturnToHub}
+              />
+            )}
 
-          {currentStep === 1 && (
-            <OperationSelectionStep
-              files={files}
-              onOperationSelect={handleOperationSelect}
-              onBack={goToPreviousStep}
-              onReturnToHub={handleReturnToHub}
-            />
-          )}
+            {currentStep === 1 && (
+              <OperationSelectionStep
+                files={files}
+                onOperationSelect={handleOperationSelect}
+                onBack={goToPreviousStep}
+                onReturnToHub={handleReturnToHub}
+              />
+            )}
 
-          {/* Transform workflow */}
-          {selectedOperation === 'transform' && (
-            <>
-              {currentStep === 2 && (
-                <ProcessStep
-                  files={files}
-                  onProcess={handleProcess}
-                  onNext={goToNextStep}
-                  onBack={goToPreviousStep}
-                  onReturnToHub={handleReturnToHub}
-                />
-              )}
+            {currentStep === 2 && selectedOperation === 'merge' && (
+              <ProcessStep
+                files={files}
+                onProcess={handleProcess}
+                onNext={goToNextStep}
+                onBack={goToPreviousStep}
+                onReturnToHub={handleReturnToHub}
+              />
+            )}
 
-              {currentStep === 3 && (
-                <TemplateMappingStep
-                  files={files}
-                  processedData={processedData}
-                  selectedTemplate={selectedTemplate}
-                  onTemplateSelect={handleTemplateSelect}
-                  onMappingComplete={handleMappingComplete}
-                  onNext={goToNextStep}
-                  onBack={goToPreviousStep}
-                />
-              )}
+            {currentStep === 2 && selectedOperation === 'format_transform' && (
+              <TemplateMappingStep
+                files={files}
+                processedData={processedData}
+                onMappingComplete={handleMappingComplete}
+                onNext={goToNextStep}
+                onBack={goToPreviousStep}
+                onReturnToHub={handleReturnToHub}
+              />
+            )}
 
-              {currentStep === 4 && (
-                <PreviewStep
-                  originalFiles={files}
-                  processedData={processedData}
-                  selectedTemplate={selectedTemplate}
-                  columnMappings={columnMappings}
-                  onExport={handleExport}
-                  onBack={goToPreviousStep}
-                  onFinish={handleFinish}
-                />
-              )}
-            </>
-          )}
+            {currentStep === 2 && selectedOperation === 'compare' && (
+              <ComparisonStep
+                files={files}
+                onFinish={handleFinish}
+                onBack={goToPreviousStep}
+              />
+            )}
 
-          {/* Compare workflow */}
-          {selectedOperation === 'compare' && currentStep === 2 && (
-            <ComparisonStep
-              files={files}
-              onBack={goToPreviousStep}
-              onFinish={handleFinish}
-            />
-          )}
-            </div>
+            {currentStep === 3 && selectedOperation === 'merge' && (
+              <PreviewStep
+                files={files}
+                processedData={processedData}
+                selectedTemplate={selectedTemplate}
+                columnMappings={columnMappings}
+                onExport={handleExport}
+                onFinish={handleFinish}
+                onBack={goToPreviousStep}
+                onReturnToHub={handleReturnToHub}
+              />
+            )}
+
+            {currentStep === 3 && selectedOperation === 'format_transform' && (
+              <PreviewStep
+                files={files}
+                processedData={processedData}
+                selectedTemplate={selectedTemplate}
+                columnMappings={columnMappings}
+                onExport={handleExport}
+                onFinish={handleFinish}
+                onBack={goToPreviousStep}
+                onReturnToHub={handleReturnToHub}
+              />
+            )}
           </div>
         </div>
       </div>

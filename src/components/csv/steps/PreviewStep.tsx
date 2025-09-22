@@ -9,25 +9,27 @@ import LivePreview from '../../LivePreview';
 import { CSVFile, CSVTemplate, TemplateColumnMapping } from '@/lib/transformationEngine';
 
 interface PreviewStepProps {
-  originalFiles: CSVFile[];
+  files: CSVFile[];
   processedData: CSVFile | null;
   selectedTemplate: CSVTemplate | null;
   columnMappings: TemplateColumnMapping[];
   onExport: (filename?: string) => void;
   onBack: () => void;
   onFinish: () => void;
+  onReturnToHub?: () => void;
 }
 
 const PreviewStep: React.FC<PreviewStepProps> = ({
-  originalFiles,
+  files,
   processedData,
   selectedTemplate,
   columnMappings,
   onExport,
   onBack,
-  onFinish
+  onFinish,
+  onReturnToHub
 }) => {
-  const sourceData = processedData || (originalFiles.length > 0 ? originalFiles[0] : null);
+  const sourceData = processedData || (files.length > 0 ? files[0] : null);
   
   // Enhanced formula evaluation function
   const evaluateFormula = React.useCallback((formula: string, row: string[], headers: string[]): string => {
@@ -119,7 +121,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
 
   // Debug logging to help identify the white screen issue
   console.log('PreviewStep render:', {
-    originalFiles: originalFiles?.length,
+    files: files?.length,
     processedData: !!processedData,
     selectedTemplate: !!selectedTemplate,
     selectedTemplateName: selectedTemplate?.name,
@@ -139,7 +141,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
             <h3 className="text-lg font-medium mb-2 text-foreground">Keine Daten verfügbar</h3>
             <p>Es wurden keine Daten zum Anzeigen gefunden.</p>
             <p className="text-sm mt-2 text-destructive">
-              Debug: Files: {originalFiles.length}, ProcessedData: {processedData ? 'Yes' : 'No'}
+              Debug: Files: {files.length}, ProcessedData: {processedData ? 'Yes' : 'No'}
             </p>
           </div>
         </div>
@@ -176,9 +178,9 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-3xl font-bold text-data-primary">{originalFiles.length}</p>
+                <p className="text-3xl font-bold text-data-primary">{files.length}</p>
                 <p className="text-sm text-muted-foreground">
-                  {originalFiles.reduce((total, file) => total + file.data.length, 0)} Datensätze gesamt
+                  {files.reduce((total, file) => total + file.data.length, 0)} Datensätze gesamt
                 </p>
               </div>
             </div>

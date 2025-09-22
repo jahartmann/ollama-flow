@@ -7,7 +7,7 @@ import { CSVFile } from '@/lib/transformationEngine';
 
 interface OperationSelectionStepProps {
   files: CSVFile[];
-  onOperationSelect: (operation: 'transform' | 'compare') => void;
+  onOperationSelect: (operation: 'merge' | 'format_transform' | 'compare') => void;
   onBack: () => void;
   onReturnToHub?: () => void;
 }
@@ -18,41 +18,51 @@ const OperationSelectionStep: React.FC<OperationSelectionStepProps> = ({
   onBack,
   onReturnToHub
 }) => {
-  const [selectedOperation, setSelectedOperation] = useState<'transform' | 'compare' | null>('transform');
+  const [selectedOperation, setSelectedOperation] = useState<'merge' | 'format_transform' | 'compare' | null>('format_transform');
 
-  // Auto-select transform as default if single file, compare if multiple files
+  // Auto-select based on number of files
   useEffect(() => {
     if (files.length >= 2) {
-      setSelectedOperation('transform'); // Default to transform, user can switch to compare
+      setSelectedOperation('format_transform'); // Default to format transform, user can switch
     } else {
-      setSelectedOperation('transform');
+      setSelectedOperation('format_transform');
     }
   }, [files.length]);
 
-  const operations = [
+const operations = [
     {
-      id: 'transform' as const,
-      title: 'Bearbeiten & Transformieren',
-      description: 'CSV-Dateien bearbeiten, zusammenführen, filtern und in neue Formate umwandeln',
+      id: 'merge' as const,
+      title: 'CSV zusammenführen',
+      description: 'Mehrere CSV-Dateien zu einer einzigen Datei verbinden',
       icon: <Edit className="w-6 h-6" />,
       color: 'bg-blue-500',
-      features: ['Dateien zusammenführen', 'Daten filtern', 'Templates anwenden', 'KI-Unterstützung'],
+      features: ['Dateien anhängen', 'Spalten verknüpfen', 'Automatisch sortieren'],
+      minFiles: 2,
+      available: files.length >= 2
+    },
+    {
+      id: 'format_transform' as const,
+      title: 'CSV Format umwandeln',
+      description: 'CSV in anderes Spaltenformat konvertieren mit Templates',
+      icon: <LayoutTemplate className="w-6 h-6" />,
+      color: 'bg-green-500',
+      features: ['Template Mapping', 'Spalten umbenennen', 'Daten transformieren'],
       minFiles: 1,
       available: files.length >= 1
     },
     {
       id: 'compare' as const,
-      title: 'Vergleichen & Differenzen',
+      title: 'CSV Unterschiede erkennen',
       description: 'Unterschiede zwischen CSV-Dateien analysieren und visualisieren',
       icon: <GitCompare className="w-6 h-6" />,
-      color: 'bg-green-500',
-      features: ['Unterschiede finden', 'Änderungen visualisieren', 'Differenz-Reports', 'Side-by-Side Vergleich'],
+      color: 'bg-purple-500',
+      features: ['Unterschiede finden', 'Änderungen visualisieren', 'Differenz-Reports'],
       minFiles: 2,
       available: files.length >= 2
     }
   ];
 
-  const handleOperationSelect = (operationId: 'transform' | 'compare') => {
+  const handleOperationSelect = (operationId: 'merge' | 'format_transform' | 'compare') => {
     setSelectedOperation(operationId);
   };
 

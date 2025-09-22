@@ -13,11 +13,12 @@ import TemplateUpload from './TemplateUpload';
 interface TemplateMappingStepProps {
   files: CSVFile[];
   processedData: CSVFile | null;
-  selectedTemplate: CSVTemplate | null;
-  onTemplateSelect: (template: CSVTemplate) => void;
+  selectedTemplate?: CSVTemplate | null;
+  onTemplateSelect?: (template: CSVTemplate) => void;
   onMappingComplete: (mappings: TemplateColumnMapping[], filters: any[]) => void;
   onBack: () => void;
   onNext: () => void;
+  onReturnToHub?: () => void;
 }
 
 interface ColumnFilter {
@@ -30,11 +31,12 @@ interface ColumnFilter {
 const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
   files,
   processedData,
-  selectedTemplate,
-  onTemplateSelect,
+  selectedTemplate = null,
+  onTemplateSelect = () => {},
   onMappingComplete,
   onBack,
-  onNext
+  onNext,
+  onReturnToHub
 }) => {
   const [mappings, setMappings] = useState<TemplateColumnMapping[]>([]);
   const [filters, setFilters] = useState<ColumnFilter[]>([]);
