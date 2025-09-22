@@ -47,6 +47,20 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
   const defaultTemplates: CSVTemplate[] = [];
   const availableTemplates = [...defaultTemplates, ...customTemplates];
 
+  // Load templates from localStorage on mount
+  React.useEffect(() => {
+    try {
+      const savedTemplates = localStorage.getItem('csv-templates');
+      if (savedTemplates) {
+        const templates = JSON.parse(savedTemplates);
+        console.log('Loaded templates from localStorage:', templates);
+        setCustomTemplates(templates);
+      }
+    } catch (error) {
+      console.error('Failed to load templates from localStorage:', error);
+    }
+  }, []);
+
   // Initialize mappings when template is selected
   React.useEffect(() => {
     if (selectedTemplate && selectedTemplate.columns) {
@@ -166,12 +180,25 @@ const TemplateMappingStep: React.FC<TemplateMappingStepProps> = ({
   };
 
   const handleTemplateCreate = (template: CSVTemplate) => {
-    setCustomTemplates(prev => [...prev, template]);
-    onTemplateSelect(template);
+    console.log('Creating new template:', template);
+    
+    // Save to localStorage for persistence
+    try {
+      const existingTemplates = JSON.parse(localStorage.getItem('csv-templates') || '[]');
+      const templatesWithNew = [...existingTemplates, { ...template, id: Date.now().toString() }];
+      localStorage.setItem('csv-templates', JSON.stringify(templatesWithNew));
+      
+      console.log('Template saved to localStorage:', templatesWithNew);
+    } catch (error) {
+      console.error('Failed to save template to localStorage:', error);
+    }
+    
+    setCustomTemplates(prev => [...prev, { ...template, id: Date.now().toString() }]);
+    onTemplateSelect({ ...template, id: Date.now().toString() });
     setShowTemplateUpload(false);
     toast({
       title: "Template erstellt",
-      description: `Template "${template.name}" wurde erfolgreich erstellt`
+      description: `Template "${template.name}" wurde erfolgreich erstellt und gespeichert`
     });
   };
 
@@ -542,20 +569,20 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
 
       {/* Data Preview */}
       {selectedTemplate && previewData.length > 0 && (
-        <Card className="shadow-elegant border-l-4 border-l-green-500">
-          <CardHeader className="bg-gradient-to-r from-green-50 to-transparent">
-            <CardTitle className="flex items-center gap-2 text-green-700">
-              <Eye className="w-5 h-5" />
+        <Card className="shadow-elegant border-l-4 border-l-accent bg-card">
+          <CardHeader className="bg-gradient-to-r from-accent/10 to-accent/5 border-b border-border">
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <Eye className="w-5 h-5 text-accent" />
               Datenvorschau (erste 5 Zeilen)
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto bg-card rounded-lg border border-border">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="bg-primary/10">
+                  <tr className="bg-primary/20 border-b-2 border-border">
                     {mappings.map((mapping, index) => (
-                      <th key={index} className="border border-primary/20 p-3 text-left text-sm font-semibold text-primary">
+                      <th key={index} className="border-r border-border p-4 text-left text-sm font-semibold text-foreground">
                         {mapping.templateColumn}
                       </th>
                     ))}
@@ -563,10 +590,12 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
                 </thead>
                 <tbody>
                   {previewData.map((row, rowIndex) => (
-                    <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-muted/30'}>
+                    <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-card' : 'bg-muted/20 hover:bg-muted/30'}>
                       {row.map((cell, cellIndex) => (
-                        <td key={cellIndex} className="border border-muted p-3 text-sm font-mono">
-                          {cell || <span className="text-muted-foreground italic">leer</span>}
+                        <td key={cellIndex} className="border-r border-b border-border p-4 text-sm">
+                          <div className="font-mono bg-muted/10 p-2 rounded text-foreground">
+                            {cell || <span className="text-muted-foreground italic">leer</span>}
+                          </div>
                         </td>
                       ))}
                     </tr>
@@ -586,12 +615,12 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
         
         <div className="flex items-center gap-3">
           {isValid ? (
-            <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
+            <Badge variant="default" className="bg-primary/20 text-primary border-primary/30">
               <CheckCircle2 className="w-3 h-3 mr-1" />
               Bereit für nächsten Schritt
             </Badge>
           ) : (
-            <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-300">
+            <Badge variant="secondary" className="bg-destructive/20 text-destructive border-destructive/30">
               <AlertCircle className="w-3 h-3 mr-1" />
               Template und Mappings erforderlich
             </Badge>
@@ -601,9 +630,9 @@ Erstelle eine JSON-Antwort mit den besten Mappings:
             onClick={handleNext} 
             disabled={!isValid}
             size="lg"
-            className="min-w-[120px]"
+            className="min-w-[120px] glow-button"
           >
-            Weiter
+            Weiter zum Export
           </Button>
         </div>
       </div>

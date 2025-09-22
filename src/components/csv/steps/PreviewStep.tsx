@@ -121,18 +121,25 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
     originalFiles: originalFiles?.length,
     processedData: !!processedData,
     selectedTemplate: !!selectedTemplate,
+    selectedTemplateName: selectedTemplate?.name,
     columnMappings: columnMappings?.length,
-    finalData: !!finalData
+    finalData: !!finalData,
+    finalDataLength: finalData?.data?.length,
+    sourceData: !!sourceData
   });
 
   if (!sourceData) {
+    console.warn('PreviewStep: No source data available');
     return (
       <div className="space-y-6">
-        <div className="glass-card p-8 text-center">
+        <div className="glass-card p-8 text-center bg-card border border-border">
           <div className="text-muted-foreground">
             <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <h3 className="text-lg font-medium mb-2">Keine Daten verfügbar</h3>
+            <h3 className="text-lg font-medium mb-2 text-foreground">Keine Daten verfügbar</h3>
             <p>Es wurden keine Daten zum Anzeigen gefunden.</p>
+            <p className="text-sm mt-2 text-destructive">
+              Debug: Files: {originalFiles.length}, ProcessedData: {processedData ? 'Yes' : 'No'}
+            </p>
           </div>
         </div>
       </div>

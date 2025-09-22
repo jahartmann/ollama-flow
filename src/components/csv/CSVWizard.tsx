@@ -473,6 +473,14 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
           {/* Main Content Area */}
           <div className="xl:col-span-4">
             <div className="data-card p-8 min-h-[600px]">
+              
+              {/* Debug Info */}
+              <div className="mb-4 p-3 bg-muted/20 rounded text-xs text-muted-foreground">
+                Debug: Step {currentStep} / {steps.length - 1} | Operation: {selectedOperation} | Files: {files.length} | 
+                ProcessedData: {processedData ? 'Yes' : 'No'} | Template: {selectedTemplate ? selectedTemplate.name : 'None'} | 
+                Mappings: {columnMappings.length}
+              </div>
+              
           {currentStep === 0 && (
             <UploadStep
               files={files}
@@ -516,22 +524,15 @@ const CSVWizard: React.FC<CSVWizardProps> = ({ onComplete }) => {
               )}
 
               {currentStep === 4 && (
-                <div>
-                  <div className="mb-4 text-sm text-muted-foreground">
-                    Debug: Preview Step - Files: {files.length}, ProcessedData: {processedData ? 'Yes' : 'No'}, 
-                    Template: {selectedTemplate ? selectedTemplate.name : 'None'}, 
-                    Mappings: {columnMappings.length}
-                  </div>
-                  <PreviewStep
-                    originalFiles={files}
-                    processedData={processedData}
-                    selectedTemplate={selectedTemplate}
-                    columnMappings={columnMappings}
-                    onExport={handleExport}
-                    onBack={goToPreviousStep}
-                    onFinish={handleFinish}
-                  />
-                </div>
+                <PreviewStep
+                  originalFiles={files}
+                  processedData={processedData}
+                  selectedTemplate={selectedTemplate}
+                  columnMappings={columnMappings}
+                  onExport={handleExport}
+                  onBack={goToPreviousStep}
+                  onFinish={handleFinish}
+                />
               )}
             </>
           )}
