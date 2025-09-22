@@ -125,26 +125,30 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
         id: 'import',
         name: file.name,
         headers: result.headers,
-        data: result.data
+        data: result.data,
+        rowCount: result.data.length,
+        delimiter: ','
       };
 
       const templateName = file.name.replace(/\.[^/.]+$/, '') + '_template';
-      const template = transformationEngine.createTemplateFromCSV(
-        csvFile, 
-        templateName,
-        `Importiert aus ${file.name}`
-      );
+      
+      // Create template manually since createTemplateFromCSV doesn't exist
+      const savedTemplate = transformationEngine.saveTemplate({
+        name: templateName,
+        description: `Importiert aus ${file.name}`,
+        columns: result.headers.map(header => ({ name: header, type: 'string' }))
+      });
 
       refreshTemplates();
       setIsImportDialogOpen(false);
 
       toast({
         title: "Template importiert",
-        description: `"${template.name}" wurde aus der CSV-Datei erstellt`
+        description: `"${savedTemplate.name}" wurde aus der CSV-Datei erstellt`
       });
 
       if (onTemplateSelect) {
-        onTemplateSelect(template);
+        onTemplateSelect(savedTemplate);
       }
       
       onTemplateUpdate?.();

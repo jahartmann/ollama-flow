@@ -46,6 +46,7 @@ class FileProcessor {
       name: parseResult.filename,
       headers: parseResult.headers,
       data: parseResult.data,
+      rowCount: parseResult.data.length,
       delimiter: finalDelimiter
     };
     

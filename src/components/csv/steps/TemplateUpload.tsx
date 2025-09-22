@@ -104,7 +104,8 @@ const TemplateUpload: React.FC<TemplateUploadProps> = ({ onTemplateCreate, onClo
         type: col.type,
         required: col.required,
         formula: col.formula
-      }))
+      })),
+      created: new Date()
     };
 
     onTemplateCreate(template);

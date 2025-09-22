@@ -149,9 +149,9 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                   name: 'Verarbeitung abgeschlossen',
                   description: 'Finales Ergebnis',
                   columnMappings: [],
-                  newColumns: [],
-                  templateMappings: []
-                }} 
+                  newColumns: []
+                }}
+                onRecipeChange={() => {}}
               />
             </div>
           )}
